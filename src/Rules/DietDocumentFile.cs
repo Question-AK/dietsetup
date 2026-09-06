@@ -1,13 +1,10 @@
 using System;
 using System.Collections.Generic;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace dietsetup.Rules;
-
-/// <summary>One diet document (architecture 4.2) -- assets/&lt;domain&gt;/config/diets/&lt;id&gt;.json,
-/// or a whole-file override at ModConfig/dietsetup/diets/&lt;id&gt;.json. Raw/pre-extends shape: field
-/// absence is meaningful (nullable) so DietCompiler can tell "not set, use the default" apart from
-/// "explicitly set to the default value," which the scope-violation checks (rules 5/6) depend on.</summary>
-public class DietDocumentFile
+public class DietDocumentFile : DietAuthoringFile
 {
     public int? SchemaVersion { get; set; }
     public string? Id { get; set; }
@@ -17,65 +14,54 @@ public class DietDocumentFile
     public DietRuleFileEntry[] Rules { get; set; } = Array.Empty<DietRuleFileEntry>();
 }
 
-public class DietCategoryFile
+public class DietCategoryFile : DietAuthoringFile
 {
     public float? Capacity { get; set; }
     public float? DrainRate { get; set; }
-
-    // Wrong-scope fields (validation rule 6) -- a category block must never set a rule multiplier.
     public float? SatietyMult { get; set; }
     public float? NutritionMult { get; set; }
 }
 
-public class DietFallbackFile
+public class DietFallbackFile : DietAuthoringFile
 {
     public float? SatietyMult { get; set; }
     public float? NutritionMult { get; set; }
 }
 
-public class DietRuleFileEntry
+public class DietRuleFileEntry : DietAuthoringFile
 {
+    public string? Trigger { get; set; }
     public string[]? Requires { get; set; }
     public string[]? Excludes { get; set; }
     public int? Priority { get; set; }
     public string? Verdict { get; set; }
     public float? SatietyMult { get; set; }
     public float? NutritionMult { get; set; }
-
-    // Curve alternative to the flat fields above, evaluated against the resolve's spoil level
-    // (architecture 6.1 rule 16: authoring both the flat and curve form for one field is fatal,
-    // not curve-wins).
     public CurveAnchorFile[]? SatietyCurve { get; set; }
     public CurveAnchorFile[]? NutritionCurve { get; set; }
 
     public DietEffectFile[]? Effects { get; set; }
-
-    // Wrong-scope field (validation rule 5) -- a rule must never set capacity.
     public float? Capacity { get; set; }
-
-    // Silences rule 12's shadowed-rule warning when true and still accurate; CheckShadowedRules
-    // re-verifies the shadowing each compile, so a rule that stops being shadowed gets a
-    // stale-flag warning instead of going silent forever.
     public bool? ShadowedIntentionally { get; set; }
 }
 
-public class CurveAnchorFile
+public class CurveAnchorFile : DietAuthoringFile
 {
     public float Spoil { get; set; }
     public float Value { get; set; }
 }
-
-/// <summary>One entry in rules[].effects (architecture 7.1/7.2). Fields are a union across every
-/// effect type; only the ones relevant to Type are read.</summary>
-public class DietEffectFile
+public class DietEffectFile : DietAuthoringFile
 {
     public string Type { get; set; } = "";
     public string? Mode { get; set; }
     public float? Amount { get; set; }
     public string? Verdict { get; set; }
     public string? Key { get; set; }
-
-    // damage/overTime only -- ignored for mode instant, which applies Amount as one immediate hit.
     public float? DurationSec { get; set; }
     public int? Ticks { get; set; }
+}
+
+public abstract class DietAuthoringFile
+{
+    [JsonExtensionData] public Dictionary<string, JToken>? UnknownFields { get; set; }
 }

@@ -11,9 +11,6 @@ using Vintagestory.API.Config;
 
 namespace dietsetup.Rules;
 
-/// <summary>One pipeline run's result: the human-readable log (written to server-main.log in
-/// full) plus the counts /dietreload's chat summary needs, and the parsed bindings table, which
-/// the caller stores per-side and syncs to clients (task 1).</summary>
 public readonly struct DietLoadResult
 {
     public readonly string Log;
@@ -31,39 +28,23 @@ public readonly struct DietLoadResult
         WarningCount = warningCount;
     }
 }
-
-/// <summary>Runs the full 8-step load pipeline (architecture 6) end to end. Called once from
-/// AssetsFinalize on each side, and again by /dietreload -- the whole point of this being one
-/// function is that both call sites run identical steps in identical order.</summary>
 public static class DietLoadPipeline
 {
     private const string ModConfigDietsDir = "dietsetup/diets";
     private const string ModConfigBindingsFile = "dietsetup/bindings.json";
     private const string ModConfigFoodTagsFile = "dietsetup/foodtags.json";
 
-    public static DietLoadResult RunAndLog(ICoreAPI api)
+    public static DietLoadResult RunAndLog(ICoreAPI api, DietSetupConfig config)
     {
         var log = new List<string>();
         int warningCount = 0;
-
-        // Step 1
-        FoodTagRegistry.Reset();
-
-        // Edibility grants (architecture 7.6) -- must run before tag resolution below, so a
-        // granted item's freshly-set NutritionProps is visible to FoodTagRegistry's
-        // relevance/untagged-nutritious accounting instead of looking untagged-and-irrelevant.
-        FoodOverrideRegistry.LoadApplyAndLog(api, log);
-
-        // Step 2
-        LoadTags(api, log);
-        FoodTagRegistry.ResolveStaticTags(api);
-
-        // Step 3
+        var tags = new FoodTagRegistry();
+        if (api.Side == EnumAppSide.Server) FoodOverrideRegistry.LoadApplyAndLog(api, log);
+        FoodOverrideRegistry.SetEnabled(api, config.EnableDietSystem);
+        LoadTags(api, tags, log);
+        tags.ResolveStaticTags(api);
         var refused = new List<(string Id, DietValidationMessage Reason)>();
         Dictionary<string, (DietDocumentFile Doc, string Domain)> raw = LoadDietDocuments(api, log, refused);
-
-        // Steps 4-7: extends, compile, derive, validate -- one diet at a time, in id order for a
-        // deterministic log.
         var compiledTable = new Dictionary<string, CompiledDiet>();
 
         var rawDocs = raw.ToDictionary(kv => kv.Key, kv => kv.Value.Doc);
@@ -89,7 +70,7 @@ public static class DietLoadPipeline
                 continue;
             }
 
-            CompiledDiet? compiledDiet = DietCompiler.Compile(id, resolved, raw[id].Domain, DietSetupModSystem.Config.CapacityFloor, fatal, warnings);
+            CompiledDiet? compiledDiet = DietCompiler.Compile(tags, id, resolved, raw[id].Domain, config.CapacityFloor, fatal, warnings);
 
             foreach (DietValidationMessage w in warnings)
             {
@@ -107,31 +88,38 @@ public static class DietLoadPipeline
             compiledTable[id] = compiledDiet;
         }
 
-        DietRuleRegistry.ReplaceAll(compiledTable);
-
-        // Rule 14 (warning): per diet, granted items (7.6) no rule matches -- one line per diet
-        // naming the count, not one line per item.
-        warningCount += LogUnmatchedGrantedItems(log, FoodOverrideRegistry.GrantedCollectibles(api.Side), compiledTable.Values);
-
-        // Step 8
+        warningCount += LogUnmatchedGrantedItems(tags, log, FoodOverrideRegistry.GrantedCollectibles(api), compiledTable.Values);
         log.Add($"[dietsetup] diets: {compiledTable.Count} loaded, {refused.Count} refused");
         int idColumnWidth = compiledTable.Count == 0 ? 0 : compiledTable.Values.Max(d => d.Id.Length) + 1;
         foreach (CompiledDiet diet in compiledTable.Values.OrderBy(d => d.Id, StringComparer.Ordinal))
         {
             log.Add(FormatDietRow(diet, idColumnWidth));
         }
-        // Refused diets are already logged once via api.Logger.Error at the point of refusal
-        // above; a REFUSED row here duplicated that into the Notification-level table.
 
         BindingsFile bindings = LoadAndLogBindings(api, log, compiledTable, ref warningCount);
 
-        log.Add($"[dietsetup] untagged nutritious collectibles: {FoodTagRegistry.UntaggedNutritiousCount}");
+        log.Add($"[dietsetup] untagged nutritious collectibles: {tags.UntaggedNutritiousCount}");
 
+        var effective = new EffectiveDietConfiguration
+        {
+            Config = config,
+            Tags = tags.Export(),
+            Diets = compiledTable.Keys.ToDictionary(id => id, id => DietExtendsResolver.Resolve(id, rawDocs, out _)!),
+            Domains = compiledTable.Keys.ToDictionary(id => id, id => raw[id].Domain),
+            Bindings = bindings,
+            Grants = DietFoodOverridesPacket.From(FoodOverrideRegistry.GrantedRows(api))
+        };
+        string payload = JsonConvert.SerializeObject(effective);
+        var owner = api.ModLoader.GetModSystem<DietSetupModSystem>();
+        long revision = api.Side == EnumAppSide.Server ? owner.Snapshot.Revision + 1 : 0;
+        owner.Publish(new DietRuntimeSnapshot(config, tags, compiledTable, bindings, revision,
+            DietConfigurationPacket.ComputeHash(payload), payload));
+        log.Add($"[dietsetup] snapshot revision={revision} hash={owner.Snapshot.Hash}");
         foreach (string line in log) api.Logger.Notification(line);
         return new DietLoadResult(string.Join("\n", log), bindings, compiledTable.Count, refused.Count, warningCount);
     }
 
-    private static void LoadTags(ICoreAPI api, List<string> log)
+    private static void LoadTags(ICoreAPI api, FoodTagRegistry tags, List<string> log)
     {
         const string tagsPath = "config/foodtags.json";
         Dictionary<AssetLocation, FoodTagConfigFile> files = api.Assets.GetMany<FoodTagConfigFile>(api.Logger, tagsPath);
@@ -139,15 +127,11 @@ public static class DietLoadPipeline
         int totalTags = 0;
         foreach ((AssetLocation loc, FoodTagConfigFile file) in files)
         {
-            FoodTagRegistry.LoadFrom(file);
+            tags.LoadFrom(file);
             int count = file.Source.Count + file.State.Count + file.Form.Count;
             totalTags += count;
             api.Logger.Notification("[dietsetup] tags: domain '{0}' registered {1} tag(s)", loc.Domain, count);
         }
-
-        // No files found is a packaging/path problem (e.g. a zip whose entries don't match the
-        // asset path the VFS expects); files found but zero tags is a content problem (empty or
-        // malformed JSON) -- distinct causes need distinct log lines to point at the right fix.
         if (files.Count == 0)
         {
             api.Logger.Warning("[dietsetup] tags: no '{0}' found in any domain -- 0 tags registered", tagsPath);
@@ -158,7 +142,7 @@ public static class DietLoadPipeline
         }
 
         string modConfigPath = Path.Combine(GamePaths.ModConfig, ModConfigFoodTagsFile);
-        if (!File.Exists(modConfigPath)) return;
+        if (api.Side != EnumAppSide.Server || !File.Exists(modConfigPath)) return;
 
         FoodTagConfigFile? overrideFile;
         try
@@ -177,115 +161,59 @@ public static class DietLoadPipeline
             return;
         }
 
-        foreach (string tag in FoodTagRegistry.ApplyOverrides(overrideFile))
+        foreach (string tag in tags.ApplyOverrides(overrideFile))
         {
             log.Add($"[dietsetup] tag '{tag}': ModConfig override wins ({modConfigPath}) over asset ({tagsPath})");
         }
     }
-
-    // Assets first (every domain), then ModConfig whole-file overrides on top (architecture 6.2).
     private static Dictionary<string, (DietDocumentFile Doc, string Domain)> LoadDietDocuments(ICoreAPI api, List<string> log, List<(string Id, DietValidationMessage Reason)> refused)
     {
-        var raw = new Dictionary<string, (DietDocumentFile Doc, string Domain)>();
-        var seenPerDomain = new Dictionary<string, HashSet<string>>();
-        var sourcePath = new Dictionary<string, string>();
-        var crossDomainPaths = new Dictionary<string, List<string>>();
-
-        Dictionary<AssetLocation, DietDocumentFile> assetFiles = api.Assets.GetMany<DietDocumentFile>(api.Logger, "config/diets/");
-        foreach ((AssetLocation loc, DietDocumentFile doc) in assetFiles)
-        {
-            if (string.IsNullOrEmpty(doc.Id))
+        var assets = api.Assets.GetMany<DietDocumentFile>(api.Logger, "config/diets/")
+            .Select(kv => (Doc: kv.Value, Domain: kv.Key.Domain, Path: kv.Key.ToString())).ToList();
+        var overrides = new List<(DietDocumentFile Doc, string Domain, string Path)>();
+        string directory = Path.Combine(GamePaths.ModConfig, ModConfigDietsDir);
+        if (api.Side == EnumAppSide.Server && Directory.Exists(directory))
+            foreach (string path in Directory.GetFiles(directory, "*.json").OrderBy(p => p, StringComparer.Ordinal))
             {
-                api.Logger.Error("[dietsetup] diet file '{0}': rule 2, missing 'id', skipped", loc);
-                continue;
-            }
-
-            if (!seenPerDomain.TryGetValue(loc.Domain, out HashSet<string>? idsInDomain))
-            {
-                seenPerDomain[loc.Domain] = idsInDomain = new HashSet<string>();
-            }
-            if (!idsInDomain.Add(doc.Id))
-            {
-                api.Logger.Error("[dietsetup] diet '{0}': rule 2, declared twice in domain '{1}' ('{2}' skipped)", doc.Id, loc.Domain, loc);
-                continue;
-            }
-
-            // Cross-domain collision refuses both, not last-domain-wins: silent override is the
-            // exact compat-pack failure mode rule 2 exists to catch (orchestrator decision, 2026-08-30).
-            // A ModConfig override below can still resolve it explicitly.
-            if (raw.TryGetValue(doc.Id, out var existing) && existing.Domain != loc.Domain)
-            {
-                if (!crossDomainPaths.TryGetValue(doc.Id, out List<string>? paths))
-                {
-                    crossDomainPaths[doc.Id] = paths = new List<string> { sourcePath[doc.Id] };
-                }
-                paths.Add(loc.ToString());
-                raw.Remove(doc.Id);
-                continue;
-            }
-
-            raw[doc.Id] = (doc, loc.Domain);
-            sourcePath[doc.Id] = loc.ToString();
-        }
-
-        string modConfigDir = Path.Combine(GamePaths.ModConfig, ModConfigDietsDir);
-        if (Directory.Exists(modConfigDir))
-        {
-            var seenInModConfig = new HashSet<string>();
-            foreach (string path in Directory.GetFiles(modConfigDir, "*.json"))
-            {
-                DietDocumentFile? doc;
                 try
                 {
-                    doc = JsonConvert.DeserializeObject<DietDocumentFile>(File.ReadAllText(path));
+                    var doc = JsonConvert.DeserializeObject<DietDocumentFile>(File.ReadAllText(path));
+                    if (doc == null) throw new InvalidDataException("empty diet document");
+                    overrides.Add((doc, "ModConfig", path));
                 }
-                catch (Exception ex)
-                {
-                    api.Logger.Error("[dietsetup] ModConfig diet override '{0}' failed to parse, skipped: {1}", path, ex.Message);
-                    continue;
-                }
-
-                if (doc == null || string.IsNullOrEmpty(doc.Id))
-                {
-                    api.Logger.Error("[dietsetup] ModConfig diet override '{0}': rule 2, missing 'id', skipped", path);
-                    continue;
-                }
-
-                if (!seenInModConfig.Add(doc.Id))
-                {
-                    api.Logger.Error("[dietsetup] ModConfig diet override for '{0}' declared twice under {1}, '{2}' skipped", doc.Id, modConfigDir, path);
-                    continue;
-                }
-
-                if (sourcePath.TryGetValue(doc.Id, out string? losingPath))
-                {
-                    log.Add($"[dietsetup] diet '{doc.Id}': ModConfig override wins ({path}) over asset ({losingPath})");
-                }
-                else if (crossDomainPaths.ContainsKey(doc.Id))
-                {
-                    log.Add($"[dietsetup] diet '{doc.Id}': ModConfig override ({path}) resolves a cross-domain conflict");
-                }
-
-                crossDomainPaths.Remove(doc.Id);
-                raw[doc.Id] = (doc, "ModConfig");
-                sourcePath[doc.Id] = path;
+                catch (Exception ex) { api.Logger.Error("[dietsetup] Cannot read '{0}': {1}", path, ex.Message); }
             }
-        }
-
-        foreach ((string id, List<string> paths) in crossDomainPaths)
-        {
-            refused.Add((id, new DietValidationMessage(2, $"declared in multiple domains ({string.Join(", ", paths)}), both refused")));
-        }
-
-        return raw;
+        return SelectDocuments(assets, overrides, log, refused);
     }
 
-    // Load-time only (like the rest of this pipeline) -- resolves each granted item against each
-    // compiled diet with the pure core, not the per-bite resolver Standing rule 6 is about.
-    // Takes explicit collectibles/diets rather than reading FoodOverrideRegistry and a pipeline-
-    // local table directly, so the client's packet-delivered grant delta (architecture 7.6 sync)
-    // can reuse this exact logic instead of a second implementation.
-    public static int LogUnmatchedGrantedItems(List<string> log, IEnumerable<CollectibleObject> granted, IEnumerable<CompiledDiet> diets)
+    internal static Dictionary<string, (DietDocumentFile Doc, string Domain)> SelectDocuments(
+        IEnumerable<(DietDocumentFile Doc, string Domain, string Path)> assets,
+        IEnumerable<(DietDocumentFile Doc, string Domain, string Path)> overrides,
+        List<string> log, List<(string Id, DietValidationMessage Reason)> refused)
+    {
+        var result = new Dictionary<string, (DietDocumentFile Doc, string Domain)>();
+        var assetList = assets.ToList(); var overrideList = overrides.ToList();
+        foreach (var row in assetList.Concat(overrideList).Where(r => string.IsNullOrWhiteSpace(r.Doc?.Id)))
+            refused.Add((row.Path, new(2, "missing diet id")));
+        var assetGroups = assetList.Where(r => !string.IsNullOrWhiteSpace(r.Doc?.Id)).GroupBy(r => r.Doc.Id!).ToDictionary(g => g.Key, g => g.ToList());
+        var overrideGroups = overrideList.Where(r => !string.IsNullOrWhiteSpace(r.Doc?.Id)).GroupBy(r => r.Doc.Id!).ToDictionary(g => g.Key, g => g.ToList());
+        foreach (string id in assetGroups.Keys.Union(overrideGroups.Keys).OrderBy(id => id, StringComparer.Ordinal))
+        {
+            var candidates = overrideGroups.TryGetValue(id, out var admin) ? admin : assetGroups[id];
+            if (candidates.Count != 1)
+            {
+                refused.Add((id, new(2, $"duplicate id refused: {string.Join(", ", candidates.Select(r => r.Path))}")));
+                continue;
+            }
+            var winner = candidates[0];
+            result.Add(id, (winner.Doc, winner.Domain));
+            if (admin != null && assetGroups.TryGetValue(id, out var losing))
+                log.Add($"[dietsetup] '{id}': override {winner.Path} replaces {string.Join(", ", losing.Select(r => r.Path))}");
+        }
+        foreach (var failure in refused) log.Add($"[dietsetup] REFUSED {failure.Id}: {failure.Reason.Text}");
+        return result;
+    }
+    public static int LogUnmatchedGrantedItems(FoodTagRegistry tags, List<string> log, IEnumerable<CollectibleObject> granted, IEnumerable<CompiledDiet> diets)
     {
         List<CollectibleObject> grantedList = granted as List<CollectibleObject> ?? granted.ToList();
         if (grantedList.Count == 0) return 0;
@@ -296,7 +224,7 @@ public static class DietLoadPipeline
             int unmatched = 0;
             foreach (CollectibleObject collectible in grantedList)
             {
-                ulong mask = FoodTagRegistry.GetStaticMask(collectible);
+                ulong mask = tags.GetStaticMask(collectible);
                 if (!DietResolver.Resolve(diet, mask, 0f).Matched) unmatched++;
             }
 
@@ -318,17 +246,12 @@ public static class DietLoadPipeline
              + $"  gain F{Gain(EnumFoodCategory.Fruit)} V{Gain(EnumFoodCategory.Vegetable)} G{Gain(EnumFoodCategory.Grain)} P{Gain(EnumFoodCategory.Protein)} D{Gain(EnumFoodCategory.Dairy)}"
              + $"  rules {diet.Rules.Length}";
     }
-
-    // Parsed, validated and logged here; DietIdResolver (task 2) is the only consumer that
-    // resolves against it. Returns the parsed table so the caller can store it per-side and
-    // sync it to clients (task 1) -- this file is ModConfig, not an asset, so a client never
-    // reads it off disk itself.
     private static BindingsFile LoadAndLogBindings(ICoreAPI api, List<string> log, Dictionary<string, CompiledDiet> compiledTable, ref int warningCount)
     {
         string path = Path.Combine(GamePaths.ModConfig, ModConfigBindingsFile);
         BindingsFile bindings;
 
-        if (!File.Exists(path))
+        if (api.Side != EnumAppSide.Server || !File.Exists(path))
         {
             bindings = new BindingsFile { SchemaVersion = 1, Default = "base" };
         }
@@ -350,6 +273,7 @@ public static class DietLoadPipeline
             }
         }
 
+        if (bindings.Bindings == null) throw new ArgumentException("bindings.json: bindings cannot be null");
         foreach ((string trait, string dietId) in bindings.Bindings)
         {
             if (!compiledTable.ContainsKey(dietId))

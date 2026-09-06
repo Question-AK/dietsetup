@@ -3,10 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace dietsetup.Rules;
-
-/// <summary>Resolves `extends` (architecture 4.4) before compilation: child categories replace
-/// parent entries by name, fallback replaces whole, rules append after the parent's (a child can
-/// never delete a parent rule). Depth capped at 8; a cycle names the whole chain.</summary>
 public static class DietExtendsResolver
 {
     private const int MaxDepth = 8;
@@ -38,6 +34,8 @@ public static class DietExtendsResolver
             return null;
         }
 
+        var errors = DietCompiler.ValidateDocument(doc);
+        if (errors.Count > 0) { error = $"diet '{id}': {string.Join("; ", errors)}"; return null; }
         chain.Add(id);
 
         if (string.IsNullOrEmpty(doc.Extends)) return doc;

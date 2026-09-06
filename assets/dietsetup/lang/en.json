@@ -1,7 +1,7 @@
 {
-    "dietsetup:verdict-inedible": "Inedible for you",
-    "dietsetup:verdict-harmful": "Harmful for you",
-    "dietsetup:verdict-nourishing": "Especially nourishing for you",
-    "dietsetup:handbook-title": "Diet & Nutrition",
-    "dietsetup:handbook-body": "Vintage Story tracks nutrition across five food categories: Fruit, Vegetable, Protein, Grain and Dairy. Keeping all five topped up raises your maximum health, and eating anything keeps your overall satiety from running out (which causes starvation damage over time).\n\nYour character has a diet, and every food item is scored against it. Most food is simply Edible, but some is Especially Nourishing for your diet (extra satiety and nutrition), Harmful (much less satiety and nutrition), or Inedible (no benefit at all). The tooltip on a food item tells you which, if it isn't plain Edible.\n\nYour diet is normally set by your race; use /diettags to see how the item in your hand is tagged, or /dietresolve <dietId> to check how it would score against a specific diet."
+  "dietsetup:verdict-inedible": "No nutritional value for you",
+  "dietsetup:verdict-harmful": "Harmful diet rating",
+  "dietsetup:verdict-nourishing": "Especially nourishing for you",
+  "dietsetup:handbook-title": "Diet & Nutrition",
+  "dietsetup:handbook-body": "Your diet controls how food contributes satiety and nutrition. Only categories with positive capacity count toward your nutrition health bonus; a zero-capacity category need not be maintained.\n\nOrdinary food keeps vanilla spoilage. Explicit freshness/spoilage rules can change that response. Inedible means zero satiety and nutrition, not that eating is blocked. Harmful and Nourishing are ratings; neither label itself deals damage or heals you. Consequences must be separately authored.\n\nRace bindings must be configured by the server administrator. Use /dietdiag to check your diet, /dietfood held or /dietfood target for ingredient facts, and /dietfood last for the last measured consumption. Bowl and pie outer-item ratings cannot summarize mixed ingredients."
 }

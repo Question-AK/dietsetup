@@ -6,19 +6,14 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.GameContent;
 
 namespace dietsetup;
-
-/// <summary>
-/// Full prefix replacement of UpdateNutrientHealthBoost (2.2): weighted average
-/// bonus = 12.5 * sum(level_i/maxSaturation * capacity_i) / sum(capacity_i). HealthWeight ==
-/// Capacity by construction (standing rule 10 -- must track DietSaturationScalePatch's gain scale).
-/// </summary>
 [HarmonyPatch(typeof(EntityBehaviorHunger), nameof(EntityBehaviorHunger.UpdateNutrientHealthBoost))]
 public static class DietNutrientHealthBoostPatch
 {
     [HarmonyPrefix]
     public static bool Prefix(EntityBehaviorHunger __instance)
     {
-        if (!DietSetupModSystem.Config.EnableDietSystem) return true;
+        using var snapshotScope = DietRuntimeSnapshot.Read(__instance.entity.Api);
+        if (!DietRuntimeSnapshot.For(__instance.entity.Api).Config.EnableDietSystem) return true;
 
         CompiledDiet? diet = DietIdResolver.ResolveDiet(__instance.entity);
         if (diet == null) return true;
@@ -28,10 +23,6 @@ public static class DietNutrientHealthBoostPatch
 
         return false;
     }
-
-    /// <summary>Exposed so /dietsetnutrition reports this exact number instead of a second
-    /// formula: EntityBehaviorHealth's public MaxHealthModifiers getter is a dead auto-property,
-    /// disconnected from the private dict SetMaxHealthModifiers actually writes.</summary>
     public static float ComputeBonus(CompiledDiet diet, EntityBehaviorHunger hunger)
     {
         float maxSaturation = hunger.MaxSaturation;
@@ -43,9 +34,6 @@ public static class DietNutrientHealthBoostPatch
         AddCategory(diet, EnumFoodCategory.Protein, hunger.ProteinLevel, maxSaturation, ref numerator, ref denominator);
         AddCategory(diet, EnumFoodCategory.Grain, hunger.GrainLevel, maxSaturation, ref numerator, ref denominator);
         AddCategory(diet, EnumFoodCategory.Dairy, hunger.DairyLevel, maxSaturation, ref numerator, ref denominator);
-
-        // No zero-denominator guard: all-zero capacity is fatal at load (rule 8), so a
-        // capacity-0 category (2.4) just drops its own term from both sums instead.
         return 12.5f * (numerator / denominator);
     }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Numerics;
 using dietsetup.Tags;
@@ -7,13 +8,7 @@ using Vintagestory.API.Common;
 
 namespace dietsetup.Rules;
 
-/// <summary>One fatal or warning finding from compiling a diet, tagged with its architecture 6.1
-/// rule number so the pipeline's log/refusal messages can cite it.</summary>
 public readonly record struct DietValidationMessage(int Rule, string Text);
-
-/// <summary>Compiles one already-extends-resolved diet document into a CompiledDiet (architecture
-/// 6 steps 5-7: compile, derive, validate). Stateless -- the pipeline owns raw loading and the
-/// final table.</summary>
 public static class DietCompiler
 {
     private static readonly EnumFoodCategory[] AllCategories =
@@ -22,8 +17,12 @@ public static class DietCompiler
         EnumFoodCategory.Protein, EnumFoodCategory.Dairy
     };
 
-    public static CompiledDiet? Compile(string id, DietDocumentFile doc, string domain, float capacityFloor, List<DietValidationMessage> fatal, List<DietValidationMessage> warnings)
+    public static CompiledDiet? Compile(FoodTagRegistry tags, string id, DietDocumentFile doc, string domain, float capacityFloor, List<DietValidationMessage> fatal, List<DietValidationMessage> warnings)
     {
+        foreach (string error in ValidateDocument(doc)) fatal.Add(new DietValidationMessage(0, error));
+        if (!float.IsFinite(capacityFloor) || capacityFloor <= 0 || !float.IsFinite(1f / capacityFloor))
+            fatal.Add(new DietValidationMessage(0, "capacityFloor must be finite and positive with finite reciprocal"));
+        if (fatal.Count > 0) return null;
         if (doc.SchemaVersion != 1)
         {
             fatal.Add(new DietValidationMessage(1, $"schemaVersion missing or unknown (got {(doc.SchemaVersion?.ToString() ?? "(missing)")})"));
@@ -31,6 +30,7 @@ public static class DietCompiler
 
         Dictionary<EnumFoodCategory, CompiledCategory> categories = CompileCategories(id, doc.Categories, capacityFloor, fatal, warnings);
 
+        if (!float.IsFinite(categories.Values.Sum(c => c.Capacity))) fatal.Add(new(0, "total capacity exceeds finite health arithmetic"));
         if (categories.Values.All(c => c.Capacity == 0f))
         {
             fatal.Add(new DietValidationMessage(8, "all five capacities are 0, this diet can never gain health"));
@@ -42,13 +42,13 @@ public static class DietCompiler
         var rules = new List<CompiledRule>(doc.Rules.Length);
         for (int i = 0; i < doc.Rules.Length; i++)
         {
-            CompiledRule? rule = CompileRule(id, doc.Rules[i], i, fatal, warnings);
+            CompiledRule? rule = CompileRule(tags, id, doc.Rules[i], i, fatal, warnings);
             if (rule != null) rules.Add(rule.Value);
         }
 
         CompiledRule[] sorted = SortByWinOrder(rules);
         CheckShadowedRules(id, sorted, warnings);
-        CheckUncoveredCategories(id, categories, sorted, fallbackNutrition, warnings);
+        CheckUncoveredCategories(tags, id, categories, sorted, fallbackNutrition, warnings);
 
         if (fatal.Count > 0) return null;
 
@@ -56,10 +56,10 @@ public static class DietCompiler
         {
             Id = id,
             SourceDomain = domain,
-            Categories = categories,
+            Categories = categories.ToImmutableDictionary(),
             FallbackSatietyMult = fallbackSatiety,
             FallbackNutritionMult = fallbackNutrition,
-            Rules = sorted,
+            Rules = sorted.ToImmutableArray(),
         };
     }
 
@@ -71,8 +71,6 @@ public static class DietCompiler
         {
             if (!Enum.TryParse(name, true, out EnumFoodCategory cat) || !AllCategories.Contains(cat))
             {
-                // Not one of the 15 numbered rules -- an unrecognized category name is a malformed
-                // document, not a scope collision, but must still refuse rather than silently drop it.
                 fatal.Add(new DietValidationMessage(0, $"categories block names unknown category '{name}'"));
                 continue;
             }
@@ -95,9 +93,6 @@ public static class DietCompiler
 
         return result;
     }
-
-    // Architecture 5.5/5.6: capacity 0 is a special case (gain scale 0, not a division), and a
-    // nonzero capacity below the floor is clamped up, logged once per diet+category (also rule 11).
     private static CompiledCategory DeriveCategory(string id, EnumFoodCategory cat, float rawCapacity, float capacityFloor, List<DietValidationMessage> warnings)
     {
         float capacity = rawCapacity;
@@ -111,7 +106,7 @@ public static class DietCompiler
         return new CompiledCategory(capacity, gainScale, capacity);
     }
 
-    private static CompiledRule? CompileRule(string id, DietRuleFileEntry rf, int declarationIndex, List<DietValidationMessage> fatal, List<DietValidationMessage> warnings)
+    private static CompiledRule? CompileRule(FoodTagRegistry tags, string id, DietRuleFileEntry rf, int declarationIndex, List<DietValidationMessage> fatal, List<DietValidationMessage> warnings)
     {
         string[] requires = rf.Requires ?? Array.Empty<string>();
         string[] excludes = rf.Excludes ?? Array.Empty<string>();
@@ -122,18 +117,14 @@ public static class DietCompiler
             fatal.Add(new DietValidationMessage(5, $"rule '{label}': sets 'capacity', a category-scoped field"));
         }
 
-        bool requiresOk = TryCompileMask(label, requires, fatal, out ulong requiresMask);
-        bool excludesOk = TryCompileMask(label, excludes, fatal, out ulong excludesMask);
+        bool requiresOk = TryCompileMask(tags, label, requires, fatal, out ulong requiresMask);
+        bool excludesOk = TryCompileMask(tags, label, excludes, fatal, out ulong excludesMask);
         if (!requiresOk || !excludesOk) return null;
 
         DietVerdict verdict = ParseVerdict(label, rf.Verdict, fatal);
 
         bool satietyIsCurve = rf.SatietyCurve is { Length: > 0 };
         bool nutritionIsCurve = rf.NutritionCurve is { Length: > 0 };
-
-        // Rule 16: a rule that authors both a flat multiplier and a curve for the same field
-        // must refuse to load, not silently prefer the curve -- the pre-ee2f142 CompiledValue
-        // schema documented "never both" without enforcing it.
         if (satietyIsCurve && rf.SatietyMult.HasValue)
         {
             fatal.Add(new DietValidationMessage(16, $"rule '{label}': sets both 'satietyMult' and 'satietyCurve' -- author one, not both"));
@@ -145,13 +136,6 @@ public static class DietCompiler
 
         float satietyMult = rf.SatietyMult ?? 1f;
         float nutritionMult = rf.NutritionMult ?? 1f;
-
-        // Architecture 7.1: satietyMult/nutritionMult/verdict are one authoring path with two
-        // spellings (the top-level field here, or an effects-list entry below) -- both must reach
-        // the same CompiledRule field DietResolver.Apply already evaluates exactly once, not a
-        // second one. Seeding rule 9's collision set with whichever top-level fields were
-        // explicitly authored (flat or curve) means writing both spellings for the same field is
-        // caught the same way as writing it twice within the effects list.
         var writtenFields = new HashSet<string>();
         if (rf.SatietyMult.HasValue || satietyIsCurve) writtenFields.Add("Satiety");
         if (rf.NutritionMult.HasValue || nutritionIsCurve) writtenFields.Add("Nutrition");
@@ -165,10 +149,9 @@ public static class DietCompiler
 
         return new CompiledRule(
             requiresMask, excludesMask, BitOperations.PopCount(requiresMask), rf.Priority ?? 0,
-            verdict, satiety, nutrition, effects, label, rf.ShadowedIntentionally ?? false);
+            verdict, satiety, nutrition, effects, label, rf.ShadowedIntentionally ?? false,
+            satietyIsCurve || nutritionIsCurve || requires.Any(t => t is "fresh" or "spoiled" or "rotten"));
     }
-
-    // FromCurve requires ascending order; authors write anchors in whatever order reads best.
     private static CurveAnchor[] SortAnchors(CurveAnchorFile[] anchorsFile)
     {
         var anchors = new CurveAnchor[anchorsFile.Length];
@@ -180,13 +163,13 @@ public static class DietCompiler
         return anchors;
     }
 
-    private static bool TryCompileMask(string ruleLabel, string[] tags, List<DietValidationMessage> fatal, out ulong mask)
+    private static bool TryCompileMask(FoodTagRegistry tags, string ruleLabel, string[] names, List<DietValidationMessage> fatal, out ulong mask)
     {
         mask = 0;
         bool ok = true;
-        foreach (string tag in tags)
+        foreach (string tag in names)
         {
-            if (!FoodTagRegistry.TryGetBit(tag, out int bit))
+            if (!tags.TryGetBit(tag, out int bit))
             {
                 fatal.Add(new DietValidationMessage(4, $"rule '{ruleLabel}': references unknown tag '{tag}'"));
                 ok = false;
@@ -200,18 +183,10 @@ public static class DietCompiler
     private static DietVerdict ParseVerdict(string ruleLabel, string? verdict, List<DietValidationMessage> fatal)
     {
         string v = verdict ?? "edible";
-        if (Enum.TryParse(v, true, out DietVerdict parsed)) return parsed;
-
-        // Not one of the 15 numbered rules -- same reasoning as the unknown-category check above.
+        if (Enum.TryParse(v, true, out DietVerdict parsed) && Enum.IsDefined(parsed)) return parsed;
         fatal.Add(new DietValidationMessage(0, $"rule '{ruleLabel}': unknown verdict '{v}'"));
         return DietVerdict.Edible;
     }
-
-    // writtenFields arrives pre-seeded with whichever top-level rule fields (satietyMult/
-    // nutritionMult/verdict) were explicitly authored -- an effects-list entry for the same field
-    // is the same collision as two effects-list entries writing it (rule 9). satietyMult/
-    // nutritionMult/verdict/ref params are the one CompiledRule field each spelling folds into
-    // (architecture 7.1: "one code path, two authoring forms") -- never a second multiply site.
     private static CompiledEffect[] CompileEffects(string ruleLabel, DietEffectFile[]? effectsFile, HashSet<string> writtenFields, List<DietValidationMessage> fatal, List<DietValidationMessage> warnings, ref float satietyMult, ref float nutritionMult, ref DietVerdict verdict)
     {
         if (effectsFile == null || effectsFile.Length == 0) return Array.Empty<CompiledEffect>();
@@ -220,7 +195,7 @@ public static class DietCompiler
 
         foreach (DietEffectFile ef in effectsFile)
         {
-            if (!Enum.TryParse(ef.Type, true, out DietEffectType type))
+            if (!Enum.TryParse(ef.Type, true, out DietEffectType type) || !Enum.IsDefined(type))
             {
                 fatal.Add(new DietValidationMessage(7, $"rule '{ruleLabel}': unknown effect type '{ef.Type}'"));
                 continue;
@@ -242,10 +217,8 @@ public static class DietCompiler
             DietVerdict? effectVerdict = null;
             if (type == DietEffectType.Verdict)
             {
-                if (!Enum.TryParse(ef.Verdict ?? "", true, out DietVerdict parsedVerdict))
+                if (!Enum.TryParse(ef.Verdict ?? "", true, out DietVerdict parsedVerdict) || !Enum.IsDefined(parsedVerdict))
                 {
-                    // Not one of the 15 numbered rules -- the effect type itself parsed fine (rule 7
-                    // is about the type string), this is its value being malformed.
                     fatal.Add(new DietValidationMessage(0, $"rule '{ruleLabel}': verdict effect has unknown verdict '{ef.Verdict}'"));
                     continue;
                 }
@@ -276,10 +249,8 @@ public static class DietCompiler
             int ticks = 1;
             if (type == DietEffectType.Damage)
             {
-                if (!Enum.TryParse(ef.Mode, true, out DietDamageMode parsedMode))
+                if (!Enum.TryParse(ef.Mode, true, out DietDamageMode parsedMode) || !Enum.IsDefined(parsedMode))
                 {
-                    // Not one of the 15 numbered rules -- same reasoning as the unknown-verdict check
-                    // above: the effect type parsed fine (rule 7), its mode value didn't.
                     fatal.Add(new DietValidationMessage(0, $"rule '{ruleLabel}': damage effect has missing or unknown mode '{ef.Mode}' (must be 'instant' or 'overTime')"));
                     continue;
                 }
@@ -290,17 +261,11 @@ public static class DietCompiler
                     ticks = Math.Max(1, ef.Ticks ?? 3);
                 }
             }
-
-            // satietyMult/nutritionMult default to 1 (no-op), matching the top-level field
-            // convention -- every other type's stored Amount defaults to 0 (no-op for damage).
             float amount = type is DietEffectType.SatietyMult or DietEffectType.NutritionMult ? ef.Amount ?? 1f : ef.Amount ?? 0f;
             list.Add(new CompiledEffect(type, amount, ef.Mode, effectVerdict, ef.Key, customEffect, damageMode, durationSec, ticks));
         }
         return list.ToArray();
     }
-
-    // Architecture 5.2 step 2: highest priority, then most specific mask, then first declared.
-    // Declaration index is an explicit tiebreak rather than relying on sort stability.
     private static CompiledRule[] SortByWinOrder(List<CompiledRule> rules)
     {
         var indexed = rules.Select((r, idx) => (Rule: r, Index: idx)).ToList();
@@ -314,10 +279,6 @@ public static class DietCompiler
         });
         return indexed.Select(t => t.Rule).ToArray();
     }
-
-    // Rule 12 (warning): rule b is unreachable if some earlier rule a in win order matches
-    // everything b would match (a's requires/excludes are a subset of b's).
-    // shadowedIntentionally is re-checked, not trusted, so a stale flag warns instead of hiding a regression.
     private static void CheckShadowedRules(string id, CompiledRule[] sorted, List<DietValidationMessage> warnings)
     {
         bool[] actuallyShadowed = new bool[sorted.Length];
@@ -348,26 +309,23 @@ public static class DietCompiler
             }
         }
     }
-
-    // Rule 10 (warning): a category with capacity > 0 that neither the fallback nor any rule can
-    // put nutrition into. A rule with no source-axis tag in requires matches food of any category.
-    private static void CheckUncoveredCategories(string id, Dictionary<EnumFoodCategory, CompiledCategory> categories, CompiledRule[] rules, float fallbackNutrition, List<DietValidationMessage> warnings)
+    private static void CheckUncoveredCategories(FoodTagRegistry tags, string id, Dictionary<EnumFoodCategory, CompiledCategory> categories, CompiledRule[] rules, float fallbackNutrition, List<DietValidationMessage> warnings)
     {
         if (fallbackNutrition > 0f) return;
 
         foreach ((EnumFoodCategory cat, CompiledCategory compiled) in categories)
         {
             if (compiled.Capacity <= 0f) continue;
-            if (rules.Any(r => r.NutritionMult.CanBePositive && RuleCoversCategory(r, cat))) continue;
+            if (rules.Any(r => r.NutritionMult.CanBePositive && RuleCoversCategory(tags, r, cat))) continue;
 
             warnings.Add(new DietValidationMessage(10, $"category '{cat}' has capacity {compiled.Capacity:F2} but no rule (and no fallback) can produce nutrition for it"));
         }
     }
 
-    private static bool RuleCoversCategory(CompiledRule rule, EnumFoodCategory cat)
+    private static bool RuleCoversCategory(FoodTagRegistry tags, CompiledRule rule, EnumFoodCategory cat)
     {
         bool referencesAnySourceTag = false;
-        foreach (string tag in FoodTagRegistry.TagNames(rule.RequiresMask))
+        foreach (string tag in tags.TagNames(rule.RequiresMask))
         {
             EnumFoodCategory? bar = FoodTagRegistry.NutrientBarFor(tag);
             if (bar == null) continue;
@@ -375,5 +333,68 @@ public static class DietCompiler
             if (bar == cat) return true;
         }
         return !referencesAnySourceTag;
+    }
+    public static List<string> ValidateDocument(DietDocumentFile? doc)
+    {
+        var errors = new List<string>();
+        void Object(DietAuthoringFile? value, string path)
+        {
+            if (value == null) { errors.Add($"{path}: null object"); return; }
+            if (value.UnknownFields != null)
+                foreach (string key in value.UnknownFields.Keys) errors.Add($"{path}.{key}: unsupported authoring field");
+        }
+        void Number(float? value, string path, bool nonnegative = false)
+        {
+            if (value.HasValue && (!float.IsFinite(value.Value) || (nonnegative && value < 0)))
+                errors.Add($"{path}: expected finite{(nonnegative ? " non-negative" : "")} number");
+        }
+        void Curve(CurveAnchorFile[]? values, string path)
+        {
+            if (values == null) return;
+            if (values.Length == 0) errors.Add($"{path}: curve must have anchors");
+            var positions = new HashSet<float>();
+            for (int i = 0; i < values.Length; i++)
+            {
+                var anchor = values[i]; Object(anchor, $"{path}[{i}]");
+                if (anchor == null) continue;
+                Number(anchor.Spoil, $"{path}[{i}].spoil"); Number(anchor.Value, $"{path}[{i}].value");
+                if (anchor.Spoil < 0 || anchor.Spoil > 1) errors.Add($"{path}[{i}].spoil: outside 0..1");
+                if (!positions.Add(anchor.Spoil)) errors.Add($"{path}: duplicate spoil position {anchor.Spoil}");
+            }
+        }
+        Object(doc, "diet");
+        if (doc == null) return errors;
+        if (doc.Categories == null) errors.Add("categories: null object");
+        else foreach (var (name, category) in doc.Categories)
+        {
+            Object(category, $"categories.{name}"); if (category == null) continue;
+            Number(category.Capacity, $"categories.{name}.capacity", true);
+            if (category.DrainRate.HasValue) errors.Add($"categories.{name}.drainRate: reserved, not supported");
+        }
+        if (doc.Fallback != null)
+        {
+            Object(doc.Fallback, "fallback");
+            Number(doc.Fallback.SatietyMult, "fallback.satietyMult"); Number(doc.Fallback.NutritionMult, "fallback.nutritionMult");
+        }
+        if (doc.Rules == null) { errors.Add("rules: null array"); return errors; }
+        for (int i = 0; i < doc.Rules.Length; i++)
+        {
+            string path = $"rules[{i}]"; var rule = doc.Rules[i];
+            Object(rule, path); if (rule == null) continue;
+            if (rule.Trigger != null && rule.Trigger != "onEat") errors.Add($"{path}.trigger: only onEat is supported");
+            if (rule.Requires?.Any(string.IsNullOrWhiteSpace) == true || rule.Excludes?.Any(string.IsNullOrWhiteSpace) == true)
+                errors.Add($"{path}: requires/excludes cannot contain null or empty tag names");
+            Number(rule.SatietyMult, path + ".satietyMult"); Number(rule.NutritionMult, path + ".nutritionMult");
+            Curve(rule.SatietyCurve, path + ".satietyCurve"); Curve(rule.NutritionCurve, path + ".nutritionCurve");
+            if (rule.Effects == null) continue;
+            for (int j = 0; j < rule.Effects.Length; j++)
+            {
+                var effect = rule.Effects[j]; string ep = $"{path}.effects[{j}]";
+                Object(effect, ep); if (effect == null) continue;
+                Number(effect.Amount, ep + ".amount"); Number(effect.DurationSec, ep + ".durationSec");
+                if (effect.DurationSec <= 0 || effect.Ticks <= 0) errors.Add($"{ep}: durationSec and ticks must be positive when supplied");
+            }
+        }
+        return errors;
     }
 }

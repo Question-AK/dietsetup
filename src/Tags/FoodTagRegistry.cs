@@ -5,37 +5,21 @@ using Vintagestory.API.Util;
 
 namespace dietsetup.Tags;
 
-/// <summary>
-/// Three-axis (source/state/form) tag registry for the diet rules engine (prompt 6, not built
-/// yet). Static tags (source, most of state, form) resolve once per collectible id at
-/// AssetsFinalize into a 64-bit bitmask array. Dynamic tags (fresh/spoiled) resolve per stack
-/// from its live transition state. No rule matching lives here.
-/// </summary>
-public static class FoodTagRegistry
+public sealed class FoodTagRegistry
 {
     public const int MaxTags = 64;
     public const string FreshTag = "fresh";
     public const string SpoiledTag = "spoiled";
 
-    private static readonly Dictionary<string, int> tagBits = new();
-    private static readonly Dictionary<string, FoodTagAxis> tagAxis = new();
-    private static readonly Dictionary<string, List<string>> tagPatterns = new();
-
-    // Keyed by (isBlock, id) -- Item.Id and Block.Id share the same low-id range (see
-    // itemMasks/blockMasks note below), so a plain id would conflate an item and a block.
-    private static readonly HashSet<(bool isBlock, int id)> loggedTransitionFailures = new();
-
-    // Item.Id and Block.Id are separate id spaces (both start near 0) -- api.World.Collectibles
-    // is just Items followed by Blocks, so a single array indexed by CollectibleObject.Id would
-    // have every low item id silently overwritten by an unrelated block sharing that same id.
-    private static ulong[] itemMasks = Array.Empty<ulong>();
-    private static ulong[] blockMasks = Array.Empty<ulong>();
-    private static ulong sourceAxisMask;
-    private static ulong stateAxisMask;
-
-    // Global source-tag -> vanilla nutrient bar mapping (spec section 2). Fixed, not
-    // per-diet and not compat-pack-extensible in v1 -- a third-party source tag with no
-    // entry here just has no bar association yet.
+    private readonly Dictionary<string, int> tagBits = new();
+    private readonly Dictionary<string, FoodTagAxis> tagAxis = new();
+    private readonly Dictionary<string, List<string>> tagPatterns = new();
+    private readonly HashSet<(bool isBlock, int id)> loggedTransitionFailures = new();
+    // Item and block IDs occupy separate spaces.
+    private ulong[] itemMasks = Array.Empty<ulong>();
+    private ulong[] blockMasks = Array.Empty<ulong>();
+    private ulong sourceAxisMask;
+    private ulong stateAxisMask;
     private static readonly Dictionary<string, EnumFoodCategory> SourceBar = new()
     {
         ["meat"] = EnumFoodCategory.Protein,
@@ -57,59 +41,33 @@ public static class FoodTagRegistry
         ["bone"] = EnumFoodCategory.Vegetable,
         ["mineral"] = EnumFoodCategory.Vegetable,
     };
-
-    // fresh/spoiled always occupy the first two bits, reserved before any config loads,
-    // so their bit positions don't depend on load order.
-    static FoodTagRegistry()
+    public FoodTagRegistry()
     {
+        // Stable reserved bits keep freshness independent of asset load order.
         EnsureBit(FreshTag, FoodTagAxis.State);
         EnsureBit(SpoiledTag, FoodTagAxis.State);
     }
 
-    public static IEnumerable<string> AllTagNames => tagBits.Keys;
-
-    /// <summary>Collectibles with NutritionProps but no source tag, recomputed each
-    /// ResolveStaticTags pass (architecture section 8's load-log line).</summary>
-    public static int UntaggedNutritiousCount { get; private set; }
-
-    /// <summary>Clears tag state before a reload pass -- mirrors DietRuleRegistry.Reset.
-    /// sourceAxisMask (accumulated by bit position) must reset too, not just the two
-    /// dictionaries -- a stale sourceAxisMask bit surviving a bit-position shift would corrupt every
-    /// mask computed afterward. Re-seeds fresh/spoiled at bits 0/1 immediately after, since the
-    /// static constructor that normally reserves them only ever runs once per process.</summary>
-    internal static void Reset()
-    {
-        tagBits.Clear();
-        tagAxis.Clear();
-        tagPatterns.Clear();
-        sourceAxisMask = 0;
-        stateAxisMask = 0;
-
-        EnsureBit(FreshTag, FoodTagAxis.State);
-        EnsureBit(SpoiledTag, FoodTagAxis.State);
-    }
-
+    public IEnumerable<string> AllTagNames => tagBits.Keys;
+    public int UntaggedNutritiousCount { get; private set; }
     public static EnumFoodCategory? NutrientBarFor(string sourceTag) =>
         SourceBar.TryGetValue(sourceTag, out EnumFoodCategory bar) ? bar : null;
-
-    /// <summary>Bit index for a registered tag name, for the rules engine to compile
-    /// requires/excludes into masks at load. False for an unregistered (likely typo'd) tag.</summary>
-    public static bool TryGetBit(string tag, out int bit) => tagBits.TryGetValue(tag, out bit);
-
-    /// <summary>Merges one config/foodtags.json's worth of tag definitions into the registry.
-    /// Every declared tag reserves a bit even with zero patterns, so a rule can reference a
-    /// tag the current mod set has no matching item for yet (e.g. "organ") without erroring.</summary>
-    public static void LoadFrom(FoodTagConfigFile file)
+    public bool TryGetBit(string tag, out int bit) => tagBits.TryGetValue(tag, out bit);
+    public void LoadFrom(FoodTagConfigFile file)
     {
+        EnsureMutable();
         LoadAxis(file.Source, FoodTagAxis.Source);
         LoadAxis(file.State, FoodTagAxis.State);
         LoadAxis(file.Form, FoodTagAxis.Form);
     }
 
-    private static void LoadAxis(Dictionary<string, string[]> tags, FoodTagAxis axis)
+    private void LoadAxis(Dictionary<string, string[]> tags, FoodTagAxis axis)
     {
+        if (tags == null) throw new ArgumentException($"foodtags.{axis}: null object");
         foreach ((string tag, string[] patterns) in tags)
         {
+            if (string.IsNullOrWhiteSpace(tag) || patterns == null || Array.Exists(patterns, string.IsNullOrWhiteSpace))
+                throw new ArgumentException($"foodtags.{axis}.{tag}: tag and patterns must be non-null and non-empty");
             EnsureBit(tag, axis);
             foreach (string pattern in patterns)
             {
@@ -121,14 +79,9 @@ public static class FoodTagRegistry
             }
         }
     }
-
-    /// <summary>ModConfig override on top of the asset merge (LoadFrom): a tag id here replaces
-    /// that id's whole pattern list rather than merging into it, since an admin overriding
-    /// "meat" almost certainly wants the asset patterns gone, not appended to. Returns the tag
-    /// ids that already existed before this call, for the caller's override-wins log line -- a
-    /// brand-new tag id introduced only by ModConfig has nothing to log a win over.</summary>
-    public static List<string> ApplyOverrides(FoodTagConfigFile file)
+    public List<string> ApplyOverrides(FoodTagConfigFile file)
     {
+        EnsureMutable();
         var replaced = new List<string>();
         ApplyOverrideAxis(file.Source, FoodTagAxis.Source, replaced);
         ApplyOverrideAxis(file.State, FoodTagAxis.State, replaced);
@@ -136,10 +89,13 @@ public static class FoodTagRegistry
         return replaced;
     }
 
-    private static void ApplyOverrideAxis(Dictionary<string, string[]> tags, FoodTagAxis axis, List<string> replaced)
+    private void ApplyOverrideAxis(Dictionary<string, string[]> tags, FoodTagAxis axis, List<string> replaced)
     {
+        if (tags == null) throw new ArgumentException($"foodtags.{axis}: null object");
         foreach ((string tag, string[] patterns) in tags)
         {
+            if (string.IsNullOrWhiteSpace(tag) || patterns == null || Array.Exists(patterns, string.IsNullOrWhiteSpace))
+                throw new ArgumentException($"foodtags.{axis}.{tag}: tag and patterns must be non-null and non-empty");
             bool existed = tagBits.ContainsKey(tag);
             EnsureBit(tag, axis);
             tagPatterns[tag] = new List<string>(patterns);
@@ -147,7 +103,7 @@ public static class FoodTagRegistry
         }
     }
 
-    private static int EnsureBit(string tag, FoodTagAxis axis)
+    private int EnsureBit(string tag, FoodTagAxis axis)
     {
         if (tagBits.TryGetValue(tag, out int existing))
         {
@@ -178,21 +134,14 @@ public static class FoodTagRegistry
         }
         return bit;
     }
-
-    /// <summary>Walks every collectible once, matching each registered static tag's wildcard
-    /// patterns against its item code, and stores one bitmask per collectible id. Call from
-    /// AssetsFinalize, on both sides -- api.World.Collectibles isn't populated any earlier.</summary>
-    public static void ResolveStaticTags(ICoreAPI api)
+    public void ResolveStaticTags(ICoreAPI api)
     {
+        EnsureMutable();
         var patternArrays = new Dictionary<string, string[]>(tagPatterns.Count);
         foreach ((string tag, List<string> patterns) in tagPatterns)
         {
             patternArrays[tag] = patterns.ToArray();
         }
-
-        // whole has no patterns of its own (config/foodtags.json's "_note") -- an item-code
-        // wildcard can't express "not ground, not liquid, not meal", so it's the form-axis
-        // default here instead, for any already-relevant item matching none of the other three.
         ulong formOtherMask = 0;
         int wholeBit = -1;
         foreach ((string tag, int bit) in tagBits)
@@ -244,22 +193,16 @@ public static class FoodTagRegistry
         }
     }
 
-    public static ulong GetStaticMask(CollectibleObject collectible)
+    public ulong GetStaticMask(CollectibleObject collectible)
     {
         int id = collectible.Id;
         ulong[] table = collectible is Block ? blockMasks : itemMasks;
         return id >= 0 && id < table.Length ? table[id] : 0;
     }
 
-    private static bool IsRelevant(ulong staticMask, CollectibleObject collectible) =>
+    private bool IsRelevant(ulong staticMask, CollectibleObject collectible) =>
         (staticMask & sourceAxisMask) != 0 || collectible.NutritionProps != null;
-
-    /// <summary>Static mask plus the fresh/spoiled bit for a spoil level the caller already has
-    /// (e.g. GlobalConstants.FoodSpoilageSatLossMul's own spoilState parameter) -- avoids
-    /// re-deriving TransitionLevel through a synthetic ItemSlot, which has no real Inventory and
-    /// so can't reproduce container-specific rot rates (crock dampening etc.) the original slot
-    /// already applied.</summary>
-    public static ulong GetTagMaskForSpoilState(CollectibleObject collectible, float spoilLevel)
+    public ulong GetTagMaskForSpoilState(CollectibleObject collectible, float spoilLevel)
     {
         ulong mask = GetStaticMask(collectible);
         if (!IsRelevant(mask, collectible)) return mask;
@@ -267,15 +210,7 @@ public static class FoodTagRegistry
         mask |= 1UL << tagBits[spoilLevel > 0f ? SpoiledTag : FreshTag];
         return mask;
     }
-
-    /// <summary>Source+form bits from the filling, state bits (raw/cooked/preserved/rotten and
-    /// fresh/spoiled) from the pie. A pie is a sealed unit: baking sterilizes every filling and the
-    /// pie ages as one thing from there, so a filling's own state -- permanently fresh
-    /// (BlockPie.UnspoilContents) and still code-tagged with whatever raw/cooked suffix it had
-    /// going in -- is the wrong read. Only ever called with a live pieSpoilLevel from the pie's own
-    /// stack; never touches the filling's own numeric spoilState, which stays the sole input to
-    /// GlobalConstants.FoodSpoilageSatLossMul's vanilla curve.</summary>
-    public static ulong GetPieFillingTagMask(CollectibleObject fillingCollectible, CollectibleObject pieCollectible, float pieSpoilLevel)
+    public ulong GetPieFillingTagMask(CollectibleObject fillingCollectible, CollectibleObject pieCollectible, float pieSpoilLevel)
     {
         ulong fillingMask = GetStaticMask(fillingCollectible);
         if (!IsRelevant(fillingMask, fillingCollectible)) return fillingMask;
@@ -285,19 +220,9 @@ public static class FoodTagRegistry
         mask |= 1UL << tagBits[pieSpoilLevel > 0f ? SpoiledTag : FreshTag];
         return mask;
     }
-
-    /// <summary>Static mask for the stack's collectible, plus fresh/spoiled read from its own
-    /// live transition state. >0f TransitionLevel is spoiled; a clean null (e.g. game:resin, no
-    /// Perish transition) resolves to fresh on purpose, not a failure. determined is false only
-    /// if the engine call itself threw. Gated to the same relevance check as ResolveStaticTags --
-    /// otherwise requires: ["fresh"] would match every non-food collectible.</summary>
-    public static ulong GetTagMask(IWorldAccessor world, ItemSlot slot, out bool determined) =>
+    public ulong GetTagMask(IWorldAccessor world, ItemSlot slot, out bool determined) =>
         GetTagMask(world, slot, out _, out determined);
-
-    /// <summary>Same as <see cref="GetTagMask(IWorldAccessor, ItemSlot, out bool)"/>, plus the
-    /// raw 0..1 spoil level the rules engine's curves evaluate against -- callers that only need
-    /// the tag set (e.g. /diettags) can ignore it via the other overload.</summary>
-    public static ulong GetTagMask(IWorldAccessor world, ItemSlot slot, out float spoilLevel, out bool determined)
+    public ulong GetTagMask(IWorldAccessor world, ItemSlot slot, out float spoilLevel, out bool determined)
     {
         determined = true;
         spoilLevel = 0f;
@@ -326,14 +251,17 @@ public static class FoodTagRegistry
         return mask;
     }
 
-    private static void LogTransitionFailureOnce(IWorldAccessor world, CollectibleObject collectible, Exception ex)
+    private void LogTransitionFailureOnce(IWorldAccessor world, CollectibleObject collectible, Exception ex)
     {
         var key = (collectible is Block, collectible.Id);
-        if (!loggedTransitionFailures.Add(key)) return;
+        lock (loggedTransitionFailures)
+        {
+            if (!loggedTransitionFailures.Add(key)) return;
+        }
         world.Logger.Error("[dietsetup] GetTagMask: transition state read failed for '{0}': {1}", collectible.Code, ex);
     }
 
-    public static IEnumerable<string> TagNames(ulong mask)
+    public IEnumerable<string> TagNames(ulong mask)
     {
         foreach ((string tag, int bit) in tagBits)
         {
@@ -342,5 +270,22 @@ public static class FoodTagRegistry
                 yield return tag;
             }
         }
+    }
+    private bool frozen;
+    internal void Freeze() => frozen = true;
+    private void EnsureMutable()
+    {
+        if (frozen) throw new InvalidOperationException("Published food tags cannot be modified.");
+    }
+
+    internal FoodTagConfigFile Export()
+    {
+        var file = new FoodTagConfigFile();
+        foreach (var (tag, axis) in tagAxis)
+        {
+            var target = axis == FoodTagAxis.Source ? file.Source : axis == FoodTagAxis.State ? file.State : file.Form;
+            target[tag] = tagPatterns.TryGetValue(tag, out var patterns) ? patterns.ToArray() : Array.Empty<string>();
+        }
+        return file;
     }
 }

@@ -6,38 +6,28 @@ using Vintagestory.GameContent;
 
 namespace dietsetup;
 
-/// <summary>
-/// Transpiler on OnEntityReceiveSaturation: deletes vanilla's "if (!flag)" guard (ldloc.1 +
-/// brtrue.s, confirmed against the shipped VSEssentials.dll IL, VS 1.22.6) around each category
-/// write, lifting it for nutrition per architecture 9 while satiety's own Math.Min cap is untouched.
-/// </summary>
+// Keep vanilla's branch, replacing its condition so live config changes also restore the full-stomach guard.
 [HarmonyPatch(typeof(EntityBehaviorHunger), nameof(EntityBehaviorHunger.OnEntityReceiveSaturation))]
 public static class DietNutritionGuardTranspiler
 {
+    internal static bool KeepGuard(bool full, EntityBehaviorHunger hunger) =>
+        full && !DietRuntimeSnapshot.For(hunger.entity.Api).Config.EnableDietSystem;
+
     [HarmonyTranspiler]
     public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
     {
-        CodeMatcher matcher = new(instructions);
-        int guardsRemoved = 0;
-
-        matcher.MatchStartForward(
-            new CodeMatch(OpCodes.Ldloc_1),
-            new CodeMatch(instr => instr.opcode == OpCodes.Brtrue || instr.opcode == OpCodes.Brtrue_S)
-        ).Repeat(m =>
+        var code = new List<CodeInstruction>(instructions);
+        int count = 0;
+        for (int i = 0; i < code.Count - 1; i++)
         {
-            List<Label> labels = new(m.Labels);
-            m.RemoveInstructions(2);
-            m.Labels.AddRange(labels);
-            guardsRemoved++;
-        });
-
-        // Local index 1 and this count are the version-pinned surface -- fail loud on IL drift, not a silent mis-patch.
-        if (guardsRemoved != 5)
-        {
-            throw new InvalidOperationException(
-                $"DietNutritionGuardTranspiler expected 5 full-stomach guards, found {guardsRemoved} -- OnEntityReceiveSaturation's IL shape changed.");
+            if (code[i].opcode != OpCodes.Ldloc_1 || (code[i + 1].opcode != OpCodes.Brtrue && code[i + 1].opcode != OpCodes.Brtrue_S)) continue;
+            code.InsertRange(i + 1, new[] { new CodeInstruction(OpCodes.Ldarg_0),
+                new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(DietNutritionGuardTranspiler), nameof(KeepGuard))) });
+            i += 2;
+            count++;
         }
-
-        return matcher.InstructionEnumeration();
+        // Five category guards and local 1 are verified against 1.22.6; reject a different engine layout.
+        if (count != 5) throw new InvalidOperationException($"Expected 5 full-stomach guards, found {count}.");
+        return code;
     }
 }

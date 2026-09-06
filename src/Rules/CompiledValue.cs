@@ -1,11 +1,6 @@
 using System;
 
 namespace dietsetup.Rules;
-
-/// <summary>A rule's satiety or nutrition value -- flat, or a curve over the resolve's spoil
-/// level (anchors linearly interpolated, clamped flat outside the range). Reintroduced
-/// 2026-09-04 after ee2f142 deleted curve capability; DietCompiler now refuses a rule that
-/// authors both forms for one field (rule 16) instead of silently preferring the curve.</summary>
 public readonly struct CompiledValue
 {
     private readonly float flat;
@@ -18,10 +13,7 @@ public readonly struct CompiledValue
     }
 
     public static CompiledValue Flat(float value) => new(value, null);
-
-    /// <summary>anchors must already be sorted ascending by Spoil -- DietCompiler sorts before
-    /// calling this.</summary>
-    public static CompiledValue FromCurve(CurveAnchor[] anchors) => new(0f, anchors);
+    public static CompiledValue FromCurve(CurveAnchor[] anchors) => new(0f, (CurveAnchor[])anchors.Clone());
 
     public float Evaluate(float spoilLevel)
     {
@@ -38,16 +30,12 @@ public readonly struct CompiledValue
             if (spoilLevel < a.Spoil || spoilLevel > b.Spoil) continue;
 
             float t = (spoilLevel - a.Spoil) / (b.Spoil - a.Spoil);
-            return a.Value + (b.Value - a.Value) * t;
+            return (float)((double)a.Value + ((double)b.Value - a.Value) * t);
         }
 
         return curve[last].Value;
     }
 
     public bool IsCurve => curve != null && curve.Length > 0;
-
-    // Rule 10's uncovered-category check (DietCompiler.CheckUncoveredCategories) needs "can this
-    // rule ever produce nutrition," not a value at one spoil level -- checking anchors is exact
-    // for monotonic-ish curves and good enough for a warning-only heuristic.
     public bool CanBePositive => curve == null ? flat > 0f : Array.Exists(curve, a => a.Value > 0f);
 }

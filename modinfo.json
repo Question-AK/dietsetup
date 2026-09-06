@@ -5,12 +5,12 @@
   "authors": [
     "Question"
   ],
-  "description": "One-time diet preference setup for new characters. Adds sliders to scale how much satiety/nutrition your character gains from each vanilla food category (Fruit, Vegetable, Protein, Grain, Dairy), so you can build a dedicated carnivore, herbivore, or anything in between.",
-  "version": "1.0.1-test.2",
+  "description": "Configurable race diets with food tags, spoilage responses, nutrition capacities, and ingredient diagnostics. Development build for Vintage Story 1.22.6.",
+  "version": "1.0.1-rc.1",
   "requiredOnClient": true,
   "requiredOnServer": true,
   "dependencies": {
-    "game": "1.22.0",
-    "survival": "1.22.0"
+    "game": "1.22.6",
+    "survival": "1.22.6"
   }
 }

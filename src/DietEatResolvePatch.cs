@@ -1,57 +1,46 @@
 using dietsetup.Binding;
-using dietsetup.Diet;
 using dietsetup.Rules;
-using dietsetup.Tags;
 using HarmonyLib;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
-using Vintagestory.API.Server;
 
 namespace dietsetup;
 
-/// <summary>
-/// Gather+resolve+apply for a standalone (non-meal) eat, on the protected CollectibleObject.tryEatStop
-/// (architecture 9). Same secondsUsed/server/slot guards as vanilla's own body, so this only fires
-/// for a real completed eat, not every eat-step tick (verified against the decompiled body,
-/// reference/decompiled/1.22/VintagestoryAPI/Vintagestory.API.Common/CollectibleObject.cs:1779-1789).
-///
-/// Prefix resolves once and enqueues the nutrition multiplier DietSaturationScalePatch consumes,
-/// then always lets tryEatStop's own body run (architecture 7.5: Inedible no longer skips it). For
-/// an Inedible verdict resolved.Nutrition is already zero (DietResolver), so the enqueued multiplier
-/// is zero and vanilla's own ReceiveSaturation/slot.TakeOut still complete the eat and consume the
-/// item -- satiety just doesn't move.
-///
-/// Postfix fires the winning rule's effects (damage, consequence) from the same resolve via __state.
-/// </summary>
+// The original stack survives final-item removal and supplies consumption evidence after vanilla runs.
 [HarmonyPatch(typeof(CollectibleObject), "tryEatStop", new[] { typeof(float), typeof(ItemSlot), typeof(EntityAgent) })]
-public static class DietEatResolvePatch
+internal static class DietEatResolvePatch
 {
     [HarmonyPrefix]
-    public static bool Prefix(float secondsUsed, ItemSlot slot, EntityAgent byEntity, out DietResolveResult? __state)
+    private static void Prefix(float secondsUsed, ItemSlot slot, EntityAgent byEntity, out DietConsumption? __state)
     {
         __state = null;
-        if (!DietSetupModSystem.Config.EnableDietSystem) return true;
-        if (byEntity?.World is not IServerWorldAccessor) return true;
-        if (secondsUsed < 0.95f) return true;
-        if (slot?.Itemstack?.Collectible == null) return true;
-
-        CompiledDiet? diet = DietIdResolver.ResolveDiet(byEntity);
-        if (diet == null) return true;
-
-        ulong tagMask = FoodTagRegistry.GetTagMask(byEntity.World, slot, out float spoilLevel, out bool determined);
-        if (!determined) return true;
-
-        DietResolveResult resolved = DietResolver.Resolve(diet, tagMask, spoilLevel);
-        __state = resolved;
-
-        DietProfileRegistry.EnqueueNutritionMultiplier(byEntity.EntityId, resolved.Nutrition);
-        return true;
+        if (secondsUsed < 0.95f || slot?.Itemstack == null) return;
+        __state = DietConsumption.Begin(byEntity);
+        if (__state == null) return;
+        var snapshot = __state.Snapshot;
+        var diet = DietIdResolver.ResolveDiet(byEntity, snapshot);
+        if (diet == null) return;
+        var stack = slot.Itemstack;
+        var collectible = stack.Collectible;
+        int count = stack.StackSize;
+        ulong mask = snapshot.Tags.GetTagMask(byEntity.World, slot, out float spoil, out bool determined);
+        if (!determined || !ReferenceEquals(stack, slot.Itemstack) || !ReferenceEquals(collectible, stack.Collectible)
+            || count != stack.StackSize) return;
+        __state.Stack = stack;
+        __state.InitialCount = count;
+        var result = DietResolver.Resolve(diet, mask, spoil);
+        __state.Pending.Enqueue(result);
+        var props = collectible.GetNutritionProperties(byEntity.World, stack, byEntity);
+        if (props != null) __state.TraceQueue.Enqueue(DietDiagnostics.Row(snapshot, byEntity, stack, mask, spoil, result,
+            props.FoodCategory, props.Satiety * Vintagestory.API.Config.GlobalConstants.FoodSpoilageSatLossMul(spoil, stack, byEntity)));
     }
 
     [HarmonyPostfix]
-    public static void Postfix(EntityAgent byEntity, DietResolveResult? __state)
+    private static void Postfix(bool __runOriginal, DietConsumption? __state)
     {
-        if (__state == null) return;
-        DietEffectRunner.Fire(byEntity.Api, byEntity, __state.Value);
+        __state?.Confirm(__runOriginal && __state.Stack != null && __state.Stack.StackSize == __state.InitialCount - 1);
     }
+
+    [HarmonyFinalizer]
+    private static void Finalizer(DietConsumption? __state) => __state?.Dispose();
 }

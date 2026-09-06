@@ -67,8 +67,7 @@
       "nutritionMult": 1.2
     },
     {
-      // Fully shadowed by the "meat" rule above (priority 35 > 20) -- kept to document that raw
-      // meat is intentionally not penalized for goblins, not an authoring mistake.
+      // Historical raw-meat rule, fully shadowed by the meat curve; fresh meat currently gives 0.30 nutrition.
       "requires": ["meat", "raw"],
       "priority": 20,
       "satietyMult": 1.0,

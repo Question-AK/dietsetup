@@ -7,41 +7,28 @@ using Vintagestory.API.Server;
 using Vintagestory.GameContent;
 
 namespace dietsetup;
-
-/// <summary>
-/// Public API: dietsetup writes a decaying per-player "intake" counter for how much of a food
-/// tag a player has recently eaten, exposed as WatchedAttributes keys any mod can read by
-/// string, no assembly reference required --
-///   "dietsetup:intake:&lt;tag&gt;"              double, 0..DietSetupConfig.RotIntakeCap, unitless
-///   "dietsetup:intake:&lt;tag&gt;:updatedHours"  double, world.Calendar.TotalHours at last write
-/// Only "rot" is written in v1 (Phase G3, for rfmechanics' goblin rot aura). Renaming either key
-/// shape breaks that consumer -- see README.md.
-///
-/// Shared accrual formula for the two patches below. Decay-then-add on the in-game calendar
-/// clock. Details: notes/dietsetup-patch-internals.md#rot-intake-accrual--rotintakeaccrualpatchcs.
-/// </summary>
 internal static class RotIntakeAccrual
 {
     private const string Tag = "rot";
     private const double DefaultHalfLifeHours = 48.0;
-    private static bool loggedCaptureException;
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ICoreAPI, object> loggedCaptureExceptions = new();
 
     internal static void LogCaptureFailure(EntityAgent byEntity, Exception ex)
     {
-        if (loggedCaptureException) return;
-        loggedCaptureException = true;
+        if (byEntity?.Api == null) return;
+        lock (loggedCaptureExceptions)
+        {
+            if (loggedCaptureExceptions.TryGetValue(byEntity.Api, out _)) return;
+            loggedCaptureExceptions.Add(byEntity.Api, new object());
+        }
         byEntity?.Api?.Logger?.Warning("[dietsetup] Rot intake capture failed; this bite grants no intake, later bites will retry: {0}", ex);
     }
-
-    /// <summary>transitionLevel &lt;= 0 (fresh food) contributes nothing and skips the write
-    /// entirely -- eating fresh food should not decay the accumulator faster than time alone
-    /// already does.</summary>
     public static void AccrueRotIntake(EntityPlayer player, float transitionLevel)
     {
         if (transitionLevel <= 0f) return;
 
-        DietSetupConfig cfg = DietSetupModSystem.Config;
-        if (!cfg.EnableRotIntakeTracking) return;
+        DietSetupConfig cfg = DietRuntimeSnapshot.For(player.Api).Config;
+        if (!cfg.EnableDietSystem || !cfg.EnableRotIntakeTracking) return;
 
         ITreeAttribute wa = player.WatchedAttributes;
         double nowHours = player.World.Calendar.TotalHours;
@@ -58,10 +45,6 @@ internal static class RotIntakeAccrual
         wa.SetDouble(updatedKey, nowHours);
     }
 }
-
-/// <summary>Standalone eating -- captures vanilla's spoilage input before consumption and
-/// confirms the original stack lost exactly one item, including the final item in a slot.
-/// No nutrition query or consumed-slot read: this evidence is local to one invocation.</summary>
 [HarmonyPatch(typeof(CollectibleObject), "tryEatStop")]
 public static class RotIntakeStandaloneEatPatch
 {
@@ -73,7 +56,7 @@ public static class RotIntakeStandaloneEatPatch
         try
         {
             if (byEntity is not EntityPlayer || byEntity.World is not IServerWorldAccessor || secondsUsed < 0.95f) return;
-            if (!DietSetupModSystem.Config.EnableRotIntakeTracking) return;
+            if (!DietRuntimeSnapshot.For(byEntity.Api).Config.EnableDietSystem || !DietRuntimeSnapshot.For(byEntity.Api).Config.EnableRotIntakeTracking) return;
 
             if (slot == null) return;
             ItemStack? stack = slot.Itemstack;
@@ -81,7 +64,6 @@ public static class RotIntakeStandaloneEatPatch
             int initialCount = stack.StackSize;
             TransitionState? state = __instance.UpdateAndGetTransitionState(byEntity.World, slot, EnumTransitionType.Perish);
             if (state == null || !float.IsFinite(state.TransitionLevel)) return;
-            // A transition read may itself replace a spoiled stack. That is not eating it.
             if (!ReferenceEquals(slot.Itemstack, stack) || !ReferenceEquals(stack.Collectible, __instance)
                 || stack.StackSize != initialCount) return;
 
@@ -105,35 +87,26 @@ public static class RotIntakeStandaloneEatPatch
         RotIntakeAccrual.AccrueRotIntake(player, evidence.TransitionLevel);
     }
 }
-
-/// <summary>
-/// Meal eating -- captures intake before tryFinishEatMeal can replace the food with an empty
-/// container (BlockMeal never calls tryEatStop). Averages TransitionLevel across the pot's contents since cooking pools freshness
-/// before it's stamped on stacks -- known, accepted limitation. Details:
-/// notes/dietsetup-patch-internals.md#rot-intake-meal--rotintakeaccrualpatchcs-rotintakemealeatpatch.
-/// BlockPie is the one exception: its fillings are held permanently fresh by UnspoilContents, so it
-/// accrues from the pie's own Perish level instead of averaging the permanently fresh fillings.
-/// </summary>
-[HarmonyPatch(typeof(BlockMeal), "tryFinishEatMeal")]
+[HarmonyPatch(typeof(BlockMeal), nameof(BlockMeal.Consume))]
 public static class RotIntakeMealEatPatch
 {
     [HarmonyPrefix]
-    public static void Prefix(BlockMeal __instance, float secondsUsed, ItemSlot slot, EntityAgent byEntity,
+    public static void Prefix(BlockMeal __instance, IPlayer eatingPlayer, ItemSlot inSlot,
         out (ItemStack Stack, CollectibleObject Collectible, float TransitionLevel)? __state)
     {
+        var byEntity = eatingPlayer.Entity;
+        var slot = inSlot;
         __state = null;
         try
         {
-            if (byEntity is not EntityPlayer || byEntity.World is not IServerWorldAccessor || secondsUsed < 1.45) return;
-            if (!DietSetupModSystem.Config.EnableRotIntakeTracking) return;
+            if (byEntity is not EntityPlayer || byEntity.World is not IServerWorldAccessor) return;
+            if (!DietRuntimeSnapshot.For(byEntity.Api).Config.EnableDietSystem || !DietRuntimeSnapshot.For(byEntity.Api).Config.EnableRotIntakeTracking) return;
 
             if (slot == null) return;
             ItemStack? stack = slot.Itemstack;
             if (stack == null || stack.StackSize <= 0 || !ReferenceEquals(stack.Collectible, __instance)) return;
             int initialCount = stack.StackSize;
             float transitionLevel;
-
-            // Read the pie's own Perish clock, not its permanently unspoiled fillings.
             if (__instance is BlockPie)
             {
                 TransitionState? pieState = __instance.UpdateAndGetTransitionState(byEntity.World, slot, EnumTransitionType.Perish);
@@ -172,10 +145,11 @@ public static class RotIntakeMealEatPatch
     }
 
     [HarmonyPostfix]
-    public static void Postfix(EntityAgent byEntity, bool __result, bool __runOriginal,
+    public static void Postfix(IPlayer eatingPlayer, float remainingServings, float __result, bool __runOriginal,
         (ItemStack Stack, CollectibleObject Collectible, float TransitionLevel)? __state)
     {
-        if (!__runOriginal || !__result || __state is not { } evidence) return;
+        var byEntity = eatingPlayer.Entity;
+        if (!__runOriginal || __result >= remainingServings || __state is not { } evidence) return;
         if (byEntity is not EntityPlayer player || byEntity.World is not IServerWorldAccessor) return;
         if (!ReferenceEquals(evidence.Stack.Collectible, evidence.Collectible)) return;
 
