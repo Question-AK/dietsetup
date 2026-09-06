@@ -24,6 +24,14 @@ internal static class RotIntakeAccrual
 {
     private const string Tag = "rot";
     private const double DefaultHalfLifeHours = 48.0;
+    private static bool loggedCaptureException;
+
+    internal static void LogCaptureFailure(EntityAgent byEntity, Exception ex)
+    {
+        if (loggedCaptureException) return;
+        loggedCaptureException = true;
+        byEntity?.Api?.Logger?.Warning("[dietsetup] Rot intake capture failed; this bite grants no intake, later bites will retry: {0}", ex);
+    }
 
     /// <summary>transitionLevel &lt;= 0 (fresh food) contributes nothing and skips the write
     /// entirely -- eating fresh food should not decay the accumulator faster than time alone
@@ -51,67 +59,126 @@ internal static class RotIntakeAccrual
     }
 }
 
-/// <summary>Standalone eating -- mirrors vanilla's own tryEatStop spoilage read
-/// (Collectible.cs:1858-1859), repurposing TransitionLevel for this accumulator instead of
-/// satiety/health falloff. Same Harmony target as DietEatDoTPatch, independent postfix.</summary>
+/// <summary>Standalone eating -- captures vanilla's spoilage input before consumption and
+/// confirms the original stack lost exactly one item, including the final item in a slot.
+/// No nutrition query or consumed-slot read: this evidence is local to one invocation.</summary>
 [HarmonyPatch(typeof(CollectibleObject), "tryEatStop")]
 public static class RotIntakeStandaloneEatPatch
 {
-    [HarmonyPostfix]
-    public static void Postfix(float secondsUsed, ItemSlot slot, EntityAgent byEntity)
+    [HarmonyPrefix]
+    public static void Prefix(CollectibleObject __instance, float secondsUsed, ItemSlot slot, EntityAgent byEntity,
+        out (ItemStack Stack, CollectibleObject Collectible, int InitialCount, float TransitionLevel)? __state)
     {
-        if (byEntity is not EntityPlayer player) return;
-        if (byEntity.World is not IServerWorldAccessor || secondsUsed < 0.95f) return;
+        __state = null;
+        try
+        {
+            if (byEntity is not EntityPlayer || byEntity.World is not IServerWorldAccessor || secondsUsed < 0.95f) return;
+            if (!DietSetupModSystem.Config.EnableRotIntakeTracking) return;
 
-        TransitionState? state = slot.Itemstack?.Collectible?.UpdateAndGetTransitionState(byEntity.World, slot, EnumTransitionType.Perish);
-        RotIntakeAccrual.AccrueRotIntake(player, state?.TransitionLevel ?? 0f);
+            if (slot == null) return;
+            ItemStack? stack = slot.Itemstack;
+            if (stack == null || stack.StackSize <= 0 || !ReferenceEquals(stack.Collectible, __instance)) return;
+            int initialCount = stack.StackSize;
+            TransitionState? state = __instance.UpdateAndGetTransitionState(byEntity.World, slot, EnumTransitionType.Perish);
+            if (state == null || !float.IsFinite(state.TransitionLevel)) return;
+            // A transition read may itself replace a spoiled stack. That is not eating it.
+            if (!ReferenceEquals(slot.Itemstack, stack) || !ReferenceEquals(stack.Collectible, __instance)
+                || stack.StackSize != initialCount) return;
+
+            __state = (stack, __instance, initialCount, state.TransitionLevel);
+        }
+        catch (Exception ex)
+        {
+            RotIntakeAccrual.LogCaptureFailure(byEntity, ex);
+        }
+    }
+
+    [HarmonyPostfix]
+    public static void Postfix(float secondsUsed, EntityAgent byEntity, bool __runOriginal,
+        (ItemStack Stack, CollectibleObject Collectible, int InitialCount, float TransitionLevel)? __state)
+    {
+        if (!__runOriginal || secondsUsed < 0.95f || __state is not { } evidence) return;
+        if (byEntity is not EntityPlayer player || byEntity.World is not IServerWorldAccessor) return;
+        if (!ReferenceEquals(evidence.Stack.Collectible, evidence.Collectible)
+            || evidence.Stack.StackSize != evidence.InitialCount - 1) return;
+
+        RotIntakeAccrual.AccrueRotIntake(player, evidence.TransitionLevel);
     }
 }
 
 /// <summary>
-/// Meal eating -- same target as DietMealEatDoTPatch, independent postfix (BlockMeal never calls
-/// tryEatStop). Averages TransitionLevel across the pot's contents since cooking pools freshness
+/// Meal eating -- captures intake before tryFinishEatMeal can replace the food with an empty
+/// container (BlockMeal never calls tryEatStop). Averages TransitionLevel across the pot's contents since cooking pools freshness
 /// before it's stamped on stacks -- known, accepted limitation. Details:
 /// notes/dietsetup-patch-internals.md#rot-intake-meal--rotintakeaccrualpatchcs-rotintakemealeatpatch.
 /// BlockPie is the one exception: its fillings are held permanently fresh by UnspoilContents, so it
-/// accrues from the pie's own Perish level instead of averaging them (never fresh, so never zero).
+/// accrues from the pie's own Perish level instead of averaging the permanently fresh fillings.
 /// </summary>
 [HarmonyPatch(typeof(BlockMeal), "tryFinishEatMeal")]
 public static class RotIntakeMealEatPatch
 {
-    [HarmonyPostfix]
-    public static void Postfix(BlockMeal __instance, ItemSlot slot, EntityAgent byEntity, bool __result)
+    [HarmonyPrefix]
+    public static void Prefix(BlockMeal __instance, float secondsUsed, ItemSlot slot, EntityAgent byEntity,
+        out (ItemStack Stack, CollectibleObject Collectible, float TransitionLevel)? __state)
     {
-        if (!__result) return;
-        if (byEntity is not EntityPlayer player) return;
-        if (byEntity.World is not IServerWorldAccessor) return;
-
-        // A pie's own Perish clock, not its (permanently unspoiled) fillings' -- see
-        // notes/1.22-meal-pie-eat-trace.md's deferred entry for why averaging fillings here
-        // would always read fresh for a pie.
-        if (__instance is BlockPie)
+        __state = null;
+        try
         {
-            TransitionState? pieState = slot.Itemstack?.Collectible.UpdateAndGetTransitionState(byEntity.World, slot, EnumTransitionType.Perish);
-            RotIntakeAccrual.AccrueRotIntake(player, pieState?.TransitionLevel ?? 0f);
-            return;
+            if (byEntity is not EntityPlayer || byEntity.World is not IServerWorldAccessor || secondsUsed < 1.45) return;
+            if (!DietSetupModSystem.Config.EnableRotIntakeTracking) return;
+
+            if (slot == null) return;
+            ItemStack? stack = slot.Itemstack;
+            if (stack == null || stack.StackSize <= 0 || !ReferenceEquals(stack.Collectible, __instance)) return;
+            int initialCount = stack.StackSize;
+            float transitionLevel;
+
+            // Read the pie's own Perish clock, not its permanently unspoiled fillings.
+            if (__instance is BlockPie)
+            {
+                TransitionState? pieState = __instance.UpdateAndGetTransitionState(byEntity.World, slot, EnumTransitionType.Perish);
+                if (pieState == null || !float.IsFinite(pieState.TransitionLevel)) return;
+                transitionLevel = pieState.TransitionLevel;
+            }
+            else
+            {
+                ItemStack[] contents = __instance.GetNonEmptyContents(byEntity.World, stack);
+                if (contents.Length == 0) return;
+
+                float total = 0f;
+                int counted = 0;
+                foreach (ItemStack contentStack in contents)
+                {
+                    if (contentStack?.Collectible == null) continue;
+                    var dummySlot = new DummySlot(contentStack);
+                    TransitionState? state = contentStack.Collectible.UpdateAndGetTransitionState(byEntity.World, dummySlot, EnumTransitionType.Perish);
+                    if (state == null) continue;
+                    if (!float.IsFinite(state.TransitionLevel)) return;
+                    total += state.TransitionLevel;
+                    counted++;
+                }
+                if (counted == 0) return;
+                transitionLevel = total / counted;
+            }
+
+            if (!float.IsFinite(transitionLevel) || !ReferenceEquals(slot.Itemstack, stack)
+                || !ReferenceEquals(stack.Collectible, __instance) || stack.StackSize != initialCount) return;
+            __state = (stack, __instance, transitionLevel);
         }
-
-        ItemStack[] contents = __instance.GetNonEmptyContents(byEntity.World, slot.Itemstack);
-        if (contents.Length == 0) return;
-
-        float total = 0f;
-        int counted = 0;
-        foreach (ItemStack contentStack in contents)
+        catch (Exception ex)
         {
-            if (contentStack?.Collectible == null) continue;
-            var dummySlot = new DummySlot(contentStack);
-            TransitionState? state = contentStack.Collectible.UpdateAndGetTransitionState(byEntity.World, dummySlot, EnumTransitionType.Perish);
-            if (state == null) continue;
-            total += state.TransitionLevel;
-            counted++;
+            RotIntakeAccrual.LogCaptureFailure(byEntity, ex);
         }
-        if (counted == 0) return;
+    }
 
-        RotIntakeAccrual.AccrueRotIntake(player, total / counted);
+    [HarmonyPostfix]
+    public static void Postfix(EntityAgent byEntity, bool __result, bool __runOriginal,
+        (ItemStack Stack, CollectibleObject Collectible, float TransitionLevel)? __state)
+    {
+        if (!__runOriginal || !__result || __state is not { } evidence) return;
+        if (byEntity is not EntityPlayer player || byEntity.World is not IServerWorldAccessor) return;
+        if (!ReferenceEquals(evidence.Stack.Collectible, evidence.Collectible)) return;
+
+        RotIntakeAccrual.AccrueRotIntake(player, evidence.TransitionLevel);
     }
 }
