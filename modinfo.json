@@ -5,8 +5,8 @@
   "authors": [
     "Question"
   ],
-  "description": "Configurable race diets with food tags, spoilage responses, nutrition capacities, and ingredient diagnostics. Development build for Vintage Story 1.22.6.",
-  "version": "1.0.1-rc.1",
+  "description": "Configurable race diets with food tags, spoilage responses, nutrition capacities, and ingredient diagnostics. For Vintage Story 1.22.6.",
+  "version": "1.0.0",
   "requiredOnClient": true,
   "requiredOnServer": true,
   "dependencies": {

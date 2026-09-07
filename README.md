@@ -1,6 +1,6 @@
 # Diet Setup
 
-Development build **1.0.1-rc.1** for Vintage Story **1.22.6 / .NET 10**. Automated checks use the installed 1.22.6 assemblies. Live singleplayer and dedicated-client gameplay acceptance are still required; newer engine versions are not certified by the dependency minimum.
+Initial baseline **1.0.0** for Vintage Story **1.22.6 / .NET 10**. Automated checks use the installed 1.22.6 assemblies. Live singleplayer and dedicated-client gameplay acceptance are still required; newer engine versions are not certified by the dependency minimum.
 
 ## Install and configure
 
@@ -87,7 +87,7 @@ Build with `dotnet build -c Release`. Set `VINTAGE_STORY` to the game install. B
 
 The hydration patch formerly shipped for Hydrate or Diedrate is removed from game assets. Hydration compatibility is not supported or claimed in this release. Elf alcohol policy, serving-scaled damage, and additional third-party food tags remain deferred. Harmony's meal interception and version-sensitive hunger guard require retesting after game upgrades. A patch-installation failure rolls back this owner's patches and fails startup.
 
-Automated regression checks cover game-assembly eating adapters and simulated client packet handling. They do not replace live tests of dedicated-client join/reload/reconnect, grants, near/full stomach, final items, mixed meals and pies, or gameplay balance. This is a local development candidate, not a public-release certification.
+Automated regression checks cover game-assembly eating adapters and simulated client packet handling. They do not replace live tests of dedicated-client join/reload/reconnect, grants, near/full stomach, final items, mixed meals and pies, or gameplay balance. This baseline still requires live gameplay acceptance; a version number does not certify those checks.
 
 ## Rot intake integration
 
