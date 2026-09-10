@@ -1,21 +1,21 @@
 {
   "_note": "whole has no patterns here on purpose. A wildcard on item code can't express 'not ground, not liquid, not meal', so FoodTagRegistry.ResolveStaticTags applies whole as the form-axis default instead: any collectible with a source tag or vanilla nutrition that matches none of ground/liquid/meal gets whole. Patterns elsewhere in this file fall into three kinds: (1) patterns that match live vanilla food; (2) patterns that match real vanilla codes carrying no nutritionProps, kept for a future admin/compat grant -- carcass-*, drycarcass-*, fishraw-*, flour-*, bone-*, bonemeal, resin*, salt, saltpeter; (3) patterns that can never match because the item computes nutrition from its live contents at runtime, not static nutritionProps -- bowl-*-meal, pie-*. Kinds (2) and (3) show up as zero-match patterns in extract.py's report -- see DEAD_PATTERN_NOTES there for the per-pattern triage; do not delete them on the strength of a zero match alone. The state axis has no fallback default: a missing state tag is a legitimate value, not a gap. About 101 vanilla foods (fungus, fresh fruit, insect, seed, most leaf/root/dairy) have no meaningful raw/cooked/preserved/spoiled distinction and are correctly left state-less. Charred codes are also deliberately unstated: a Dwarf gains little from charred food and should not be punished for it either.",
   "source": {
-    "meat": ["game:redmeat-*", "game:bushmeat-*", "game:poultry-*", "game:pemmican-*"],
+    "meat": ["game:redmeat-*", "game:bushmeat-*", "game:poultry-*", "game:pemmican-*", "butchering:primemeat-*", "butchering:smoked-*-primemeat", "primitivesurvival:snakemeat-*", "primitivesurvival:jerky-bushmeat-*", "primitivesurvival:jerky-redmeat-*", "primitivesurvival:curedsmokedmeat-redmeat-*", "primitivesurvival:curedsmokedmeat-bushmeat-*", "primitivesurvival:curedsmokedmeat-poultry-*", "primitivesurvival:smokedmeat-redmeat-*", "primitivesurvival:smokedmeat-bushmeat-*", "primitivesurvival:smokedmeat-poultry-*"],
     "organ": ["game:fat", "game:fat-rendered"],
     "blood": [],
     "carrion": ["game:carcass-*", "game:drycarcass-*"],
-    "fish": ["game:fish-*", "game:fishraw-*", "game:fishchunk-*"],
+    "fish": ["game:fish-*", "game:fishraw-*", "game:fishchunk-*", "primitivesurvival:fishfillet-*", "primitivesurvival:jerky-fish-*", "primitivesurvival:curedsmokedmeat-fish-*", "primitivesurvival:smokedmeat-fish-*"],
     "insect": ["game:insect-*"],
     "egg": ["game:egg-*"],
     "dairy": ["game:cheese-*", "game:milkportion*", "game:butter-*", "game:curdportion*", "game:curdledmilkportion*", "game:wheycurdportion*", "game:cottagecheeseportion"],
-    "grain": ["game:bread-*", "game:flour-*", "game:grain-*", "game:dough-*"],
-    "root": ["game:vegetable-carrot*", "game:vegetable-turnip*", "game:vegetable-parsnip*", "game:vegetable-cassava*", "game:vegetable-cookedcattailroot*", "game:vegetable-cookedpapyrusroot*", "game:vegetable-onion", "game:pickledvegetable-carrot", "game:pickledvegetable-parsnip", "game:pickledvegetable-turnip", "game:pickledvegetable-onion", "game:rawcassava-*"],
-    "leaf": ["game:vegetable-cabbage*", "game:vegetable-fennel*", "game:vegetable-bambooshoot", "game:pickledvegetable-cabbage", "game:pickledvegetable-fennel"],
-    "fruit": ["game:fruit-*", "game:honeycomb", "game:vegetable-pumpkin*", "game:vegetable-bellpepper*", "game:vegetable-olive*", "game:pickledvegetable-bellpepper", "game:pickledvegetable-pumpkin", "game:pickledvegetable-olive", "game:juiceportion-*", "game:pineapple"],
+    "grain": ["game:bread-*", "game:flour-*", "game:grain-*", "game:dough-*", "wetcrops:grain-*", "wetcrops:flour-africanrice", "wetcrops:flour-wildrice", "wetcrops:dough-africanrice", "wetcrops:dough-wildrice", "wetcrops:bread-africanrice-*", "wetcrops:bread-wildrice-*"],
+    "root": ["game:vegetable-carrot*", "game:vegetable-turnip*", "game:vegetable-parsnip*", "game:vegetable-cassava*", "game:vegetable-cookedcattailroot*", "game:vegetable-cookedpapyrusroot*", "game:vegetable-onion", "game:pickledvegetable-carrot", "game:pickledvegetable-parsnip", "game:pickledvegetable-turnip", "game:pickledvegetable-onion", "game:rawcassava-*", "wetcrops:taro-*", "wetcrops:flour-taro", "wetcrops:dough-taro", "wetcrops:bread-taro-*", "wetcrops:vegetable-wasabi", "wetcrops:pickledvegetable-wasabi"],
+    "leaf": ["game:vegetable-cabbage*", "game:vegetable-fennel*", "game:vegetable-bambooshoot", "game:pickledvegetable-cabbage", "game:pickledvegetable-fennel", "wetcrops:vegetable-watercress", "wetcrops:vegetable-kangkung", "wetcrops:pickledvegetable-watercress", "wetcrops:pickledvegetable-kangkung"],
+    "fruit": ["game:fruit-*", "game:honeycomb", "game:vegetable-pumpkin*", "game:vegetable-bellpepper*", "game:vegetable-olive*", "game:pickledvegetable-bellpepper", "game:pickledvegetable-pumpkin", "game:pickledvegetable-olive", "game:juiceportion-*", "game:pineapple", "expandedfoods:dryfruit-*"],
     "seed": ["game:legume-*", "game:pickledlegume-*"],
     "nut": ["game:treeseed-walnut"],
-    "fungus": ["game:mushroom-*"],
+    "fungus": ["game:mushroom-*", "expandedfoods:choppedmushroom-*", "expandedfoods:cookedchoppedmushroom-*", "expandedfoods:cookedmushroom-*"],
     "sap": [],
     "resin": ["game:resin*"],
     "bone": ["game:bone-*", "game:bonemeal"],
@@ -26,14 +26,14 @@
     "vinegar": ["game:vinegarportion"]
   },
   "state": {
-    "raw": ["game:*-raw", "game:pemmican-raw-*"],
-    "cooked": ["game:*-cooked", "game:*-perfect", "game:*-boiled", "game:vegetable-cookedcattailroot", "game:vegetable-cookedpapyrusroot", "game:*-smoked", "game:pie-partbaked", "game:pie-charred"],
-    "preserved": ["game:*-cured", "game:*-smoked", "game:*-dried", "game:pickledvegetable-*", "game:pickledlegume-*", "game:pemmican-dried-*"],
+    "raw": ["game:*-raw", "game:pemmican-raw-*", "butchering:primemeat-raw", "primitivesurvival:fishfillet-raw", "primitivesurvival:snakemeat-raw", "primitivesurvival:jerky-*-raw", "primitivesurvival:curedsmokedmeat-*-raw", "primitivesurvival:smokedmeat-*-raw", "wetcrops:taro-raw"],
+    "cooked": ["game:*-cooked", "game:*-perfect", "game:*-boiled", "game:vegetable-cookedcattailroot", "game:vegetable-cookedpapyrusroot", "game:*-smoked", "game:pie-partbaked", "game:pie-charred", "butchering:primemeat-cooked", "butchering:smoked-*-primemeat", "primitivesurvival:fishfillet-partbaked", "primitivesurvival:fishfillet-cooked", "primitivesurvival:snakemeat-partbaked", "primitivesurvival:snakemeat-cooked", "primitivesurvival:jerky-*-cooked", "primitivesurvival:curedsmokedmeat-*-partbaked", "primitivesurvival:curedsmokedmeat-*-cooked", "primitivesurvival:smokedmeat-*-partbaked", "primitivesurvival:smokedmeat-*-cooked", "wetcrops:bread-*-partbaked", "wetcrops:bread-*-perfect", "expandedfoods:cookedchoppedmushroom-*-partbaked", "expandedfoods:cookedchoppedmushroom-*-perfect", "expandedfoods:cookedmushroom-*-partbaked", "expandedfoods:cookedmushroom-*-perfect"],
+    "preserved": ["game:*-cured", "game:*-smoked", "game:*-dried", "game:pickledvegetable-*", "game:pickledlegume-*", "game:pemmican-dried-*", "butchering:primemeat-curedhealing", "butchering:smoked-*-primemeat", "primitivesurvival:jerky-*-cured", "primitivesurvival:curedsmokedmeat-*-raw", "primitivesurvival:curedsmokedmeat-*-partbaked", "primitivesurvival:curedsmokedmeat-*-cooked", "primitivesurvival:smokedmeat-*-raw", "primitivesurvival:smokedmeat-*-partbaked", "primitivesurvival:smokedmeat-*-cooked", "wetcrops:taro-dried", "wetcrops:pickledvegetable-wasabi", "wetcrops:pickledvegetable-watercress", "wetcrops:pickledvegetable-kangkung", "expandedfoods:dryfruit-*"],
     "rotten": ["game:rot"]
   },
   "form": {
     "whole": [],
-    "ground": ["game:flour-*", "game:bonemeal"],
+    "ground": ["game:flour-*", "game:bonemeal", "wetcrops:flour-*"],
     "liquid": ["game:milkportion*", "game:curdportion*", "game:curdledmilkportion*", "game:wheycurdportion*", "game:cottagecheeseportion", "game:alcoholportion", "game:spiritportion-*", "game:ciderportion-*", "game:honeyportion", "game:jamhoneyportion", "game:juiceportion-*", "game:vinegarportion"],
     "meal": ["game:bowl-*-meal", "game:pie-*"]
   }
