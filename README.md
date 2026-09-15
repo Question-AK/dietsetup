@@ -1,6 +1,6 @@
 # Diet Setup
 
-Development build **1.0.1-rc.1** for Vintage Story **1.22.6 / .NET 10**. Automated checks use the installed 1.22.6 assemblies. Live singleplayer and dedicated-client gameplay acceptance are still required; newer engine versions are not certified by the dependency minimum.
+Current source declares development build **1.0.1-rc.1** for Vintage Story **1.22.6 / .NET 10**. It is an unpublished RC, not a deployed or approved package; the pinned, ModDB-accessible **1.0.0** baseline remains the approved package set. Automated checks use the installed 1.22.6 assemblies. Live singleplayer and dedicated-client gameplay acceptance are still required; newer engine versions are not certified by the dependency minimum.
 
 ## Install and configure
 
@@ -85,7 +85,7 @@ Tag examples and edibility grant examples are included in `ModConfig-examples`. 
 
 Build with `dotnet build -c Release`. Set `VINTAGE_STORY` to the game install. Builds do not deploy by default. `Package.ps1 -Dll bin/Release/Mods/dietsetup.dll -Configuration Release` creates a local archive and SHA-256 sidecar. An existing version with different content, including DLL bytes, is refused. Public dev builds must have distinct prerelease versions. Explicit deployment paths are optional.
 
-The hydration patch formerly shipped for Hydrate or Diedrate is removed from game assets. Hydration compatibility is not supported or claimed in this release. Elf alcohol policy, serving-scaled damage, and additional third-party food tags remain deferred. Harmony's meal interception and version-sensitive hunger guard require retesting after game upgrades. A patch-installation failure rolls back this owner's patches and fails startup.
+The hydration patch formerly shipped for Hydrate or Diedrate is removed from game assets. Hydration compatibility is not supported or claimed in this release. BlockPie is not a confirmed source-level release blocker: the historical outer-spoilage defect is fixed, with baking quality retained separately and pie identity/spoil level included in resolution caching. Mixed fillings, spoiled final servings, and tooltip/source identity still need live acceptance. The remaining gates are custom-namespace food tags (cooked Butchering prime meat currently resolves as fresh food, expected 0 / actual 1.25), ACA's incompatible patch-order collision on `BlockMeal.GetContentNutritionProperties`, external drink integrations, tooltip/source identity divergence, the disconnected `/dietdiag` health value, malformed upstream nutrition handling, and the live acceptance pass. Elf alcohol policy, serving-scaled damage, and additional third-party food tags remain deferred. Harmony's meal interception and version-sensitive hunger guard require retesting after game upgrades. A patch-installation failure rolls back this owner's patches and fails startup.
 
 Automated regression checks cover game-assembly eating adapters and simulated client packet handling. They do not replace live tests of dedicated-client join/reload/reconnect, grants, near/full stomach, final items, mixed meals and pies, or gameplay balance. This is a local development candidate, not a public-release certification.
 
