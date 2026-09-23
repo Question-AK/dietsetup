@@ -20,6 +20,8 @@ internal sealed class DietIngredientTrace
     internal string Rule = "";
     internal DietVerdict Verdict;
     internal EnumFoodCategory Category;
+    /// <summary>Satiety this row computed, before the player's own capacity and headroom limit what is
+    /// credited; <see cref="CreditedSatiety"/> is the delivered figure. Portion rows sum back to it.</summary>
     internal float SatietyContribution;
     internal float NutritionMultiplier;
     internal float CapacityScale;
@@ -81,14 +83,16 @@ internal static class DietDiagnostics
         row.Contributions = set.Components.Any(c => c.Basis == DietContributionBasis.Unresolved)
             ? set.Components.Any(c => c.Basis == DietContributionBasis.Approximated) ? "approximated+unresolved" : "unresolved"
             : "approximated";
-        foreach (var component in set.Components)
+        var split = set.SatietySplit(satiety);
+        for (int i = 0; i < set.Components.Length; i++)
         {
+            var component = set.Components[i];
             var portion = new DietIngredientTrace
             {
                 Ingredient = component.Label, Diet = row.Diet, Snapshot = row.Snapshot,
                 Tags = string.Join(",", snapshot.Tags.TagNames(component.Mask)), Spoil = spoil,
                 Rule = component.Result.WinningRule, Verdict = component.Result.Verdict, Category = category,
-                SatietyContribution = satiety * component.Share, NutritionMultiplier = component.Result.Nutrition,
+                SatietyContribution = split[i], NutritionMultiplier = component.Result.Nutrition,
                 CapacityScale = row.CapacityScale, PortionShare = component.Share, Basis = component.Basis
             };
             row.Portions.Add(portion);

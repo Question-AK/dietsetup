@@ -136,6 +136,26 @@ public sealed class DietContributionSet
         return shares > 0f ? byShare / shares : Whole.Nutrition;
     }
 
+    /// <summary>One mouthful's satiety apportioned over the components in the same weights
+    /// <see cref="Satiety"/> summed, so a report states what a portion contributed rather than what
+    /// share of the item it is. The parts always sum back to <paramref name="mouthfulSatiety"/>.</summary>
+    public ImmutableArray<float> SatietySplit(float mouthfulSatiety)
+    {
+        if (!IsComposite) return ImmutableArray.Create(mouthfulSatiety);
+        float vanilla = Spoilage.Value;
+        var parts = new float[Components.Length];
+        float total = 0f;
+        for (int i = 0; i < Components.Length; i++)
+        {
+            parts[i] = Components[i].Share * Components[i].EffectiveSatiety(vanilla);
+            total += parts[i];
+        }
+        // Satiety() clamps a blend of zero or less to nothing, so there is no contribution to divide.
+        if (total <= 0f) return ImmutableArray.Create(new float[Components.Length]);
+        for (int i = 0; i < parts.Length; i++) parts[i] = mouthfulSatiety * (parts[i] / total);
+        return ImmutableArray.Create(parts);
+    }
+
     internal DietContributionSet WithGroup(object group) =>
         new(Components, Whole, IsComposite, ItemMask, Spoilage, group);
 }

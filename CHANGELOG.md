@@ -12,6 +12,9 @@
 - A grant file naming a diet that fails to compile now withdraws its grants instead of leaving a
   material nobody can ever eat, and a grant table that arrives unreadable is refused whole rather
   than dropping the unreadable row.
+- `/dietfood` now reports what each portion of a composite food actually contributed instead of its
+  share of the whole. A portion a diet refuses reads zero rather than its slice of the total, and the
+  portion rows sum back to the composite. No nourishment calculation changed.
 
 ## 1.0.1-rc.1 ? candidate, unpublished
 
