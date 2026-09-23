@@ -44,18 +44,20 @@ internal static class DietAcaExpandedFoodPatch
         if (diet == null) return;
         snapshot.Tags.GetTagMask(byEntity.World, slot, out float spoil, out bool determined);
         if (!determined) return;
-        // Running the spoilage hook first caches the resolve under vanilla's own multiplier.
-        float vanilla = GlobalConstants.FoodSpoilageSatLossMul(spoil, stack, byEntity);
+        // Running the spoilage hook first caches the resolve under vanilla's own multiplier, and
+        // yields the multiplier ACA itself is about to apply to every row.
+        float satietyMul = GlobalConstants.FoodSpoilageSatLossMul(spoil, stack, byEntity);
         if (!DietSpoilageResolution.TryResolve(spoil, stack, byEntity, out var resolved)) return;
 
-        // The rows carry real per-category nourishment but no identity of their own, so each resolves
-        // against the item's own tags and keeps its upstream category.
+        // The rows carry per-category nourishment but no identity of their own, so each resolves
+        // against the item's own tags and keeps its upstream category. A declared composition
+        // therefore splits every row by the same shares: expandedSats records no per-category origin.
         foreach (var row in rows)
         {
             var set = resolved.WithGroup(group);
             __state.Pending.Enqueue(set);
             __state.TraceQueue.Enqueue(DietDiagnostics.Row(snapshot, byEntity, stack, spoil, set,
-                row.FoodCategory, row.Satiety * vanilla));
+                row.FoodCategory, row.Satiety * satietyMul));
         }
     }
 

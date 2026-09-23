@@ -15,7 +15,7 @@ namespace dietsetup;
 [HarmonyPatch(typeof(BlockMeal), nameof(BlockMeal.GetContentNutritionProperties),
     new[] { typeof(IWorldAccessor), typeof(ItemSlot), typeof(ItemStack[]), typeof(EntityAgent), typeof(bool), typeof(float), typeof(float) })]
 [HarmonyPriority(Priority.First)]
-[HarmonyBefore(DietAcaIntegration.ModId)]
+[HarmonyBefore(DietAcaIntegration.HarmonyId, DietAcaIntegration.ModId)]
 public static class DietMealContentNutritionPatch
 {
     [HarmonyPrefix]

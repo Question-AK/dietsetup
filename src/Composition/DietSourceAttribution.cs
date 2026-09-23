@@ -37,9 +37,9 @@ public readonly struct DietSourceAttribution
 
 public delegate DietSourceAttribution DietSourceAttributionProvider(ItemStack stack);
 
-/// <summary>The seam through which a runtime supplies real source attribution. Nothing registers here
-/// yet: A Culinary Artillery exposes category totals only, and deciding whether those can ever yield
-/// source attribution is Task 4B.</summary>
+/// <summary>The seam through which a runtime supplies real source attribution. Nothing registers here:
+/// A Culinary Artillery exposes nutrient-category totals and un-quantified ingredient codes, neither of
+/// which is a source split, so ACA foods keep using declared approximations.</summary>
 public static class DietSourceAttributionRegistry
 {
     private static volatile (string Id, DietSourceAttributionProvider Provider)[] providers =

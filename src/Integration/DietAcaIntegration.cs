@@ -13,6 +13,9 @@ namespace dietsetup;
 internal static class DietAcaIntegration
 {
     internal const string ModId = "aculinaryartillery";
+    /// <summary>ACA's Harmony instance id, which is not its mod id: HarmonyBefore is matched against
+    /// this string, so naming the mod id there silently does nothing (ACA 2.0.0-dev.22).</summary>
+    internal const string HarmonyId = "com.jakecool19.efrecipes.cookingoverhaul";
     private const string RawFoodType = "ACulinaryArtillery.ItemExpandedRawFood";
     private const string FoodType = "ACulinaryArtillery.ItemExpandedFood";
     private const string SatsAttribute = "expandedSats";
@@ -60,9 +63,10 @@ internal static class DietAcaIntegration
     private static float[]? Sats(ItemStack? stack) =>
         (stack?.Attributes?[SatsAttribute] as FloatArrayAttribute)?.value is { Length: 6 } value ? value : null;
 
-    /// <summary>True when the stack carries ACA's per-nutrient-category totals. These say which hunger
-    /// bars to credit and nothing about what the food is made of, so they are not source-attributed
-    /// contributions and never displace a declared approximation; see Task 4B.</summary>
+    /// <summary>True when the stack carries ACA's per-nutrient-category totals: six floats over
+    /// health and the five hunger bars. They say which bars to credit and nothing about what the food
+    /// is made of, and the companion 'madeWith' attribute lists ingredient codes without quantities,
+    /// so neither can yield source attribution. A declared approximation therefore still applies.</summary>
     internal static bool HasCategoryTotals(ItemStack? stack)
     {
         Probe();

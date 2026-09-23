@@ -11,7 +11,7 @@ namespace dietsetup;
 // ACA replaces this method too; running first keeps the display-only flag set whichever prefix ends up
 // producing the text, so a preview can never be mistaken for a real meal.
 [HarmonyPriority(Priority.First)]
-[HarmonyBefore(DietAcaIntegration.ModId)]
+[HarmonyBefore(DietAcaIntegration.HarmonyId, DietAcaIntegration.ModId)]
 public static class DietMealContentNutritionFactsPatch
 {
     [HarmonyPrefix]
