@@ -48,6 +48,9 @@ public static class FoodOverrideRegistry
         public readonly List<CollectibleObject> Granted = new();
         public readonly List<(CollectibleObject Collectible, EnumFoodCategory Category, float BaseSatiety, FoodAccessRule Access)> GrantedRows = new();
         public readonly Dictionary<CollectibleObject, FoodAccessRule> Access = new();
+        /// <summary>What this apply added, so a post-compilation refusal can take back exactly its own
+        /// mutations instead of clearing a table another apply owns.</summary>
+        public readonly List<CollectibleObject> AppliedThisRun = new();
         public int RestrictedCount;
     }
 
@@ -389,6 +392,7 @@ public static class FoodOverrideRegistry
         }
 
         int grantedCount = 0, restrictedCount = 0;
+        state.AppliedThisRun.Clear();
         foreach ((CollectibleObject collectible, List<int> rowIdx) in perCollectible)
         {
             int winner = rowIdx.Count == 1 ? rowIdx[0] : rowIdx.OrderByDescending(i => rows[i].Specificity).First();
@@ -409,6 +413,7 @@ public static class FoodOverrideRegistry
             state.Owned[collectible] = collectible.NutritionProps;
             state.Granted.Add(collectible);
             state.GrantedRows.Add((collectible, row.Category, row.BaseSatiety, row.Access));
+            state.AppliedThisRun.Add(collectible);
             Restrict(state, collectible, row.Access);
             if (row.Access.Restricts) restrictedCount++;
             grantedCount++;
@@ -423,11 +428,50 @@ public static class FoodOverrideRegistry
         if (rule.Restricts) state.RestrictedCount++;
     }
 
+    /// <summary>Grants apply before diets compile, so a listed permission can name a diet that was
+    /// selected and then refused by the compiler. Selection is not enough: such a rule would bar every
+    /// player from a material forever. The whole apply is withdrawn rather than published, which leaves
+    /// the restricted material not edible at all instead of edible by everyone.</summary>
+    internal static bool FinalizeAgainstCompiledDiets(ICoreAPI api, IReadOnlyCollection<string> compiledDietIds, List<string> log)
+    {
+        if (!stateBySide.TryGetValue(api, out SideState? state) || state.AppliedThisRun.Count == 0) return true;
+
+        var applied = new HashSet<CollectibleObject>(state.AppliedThisRun);
+        var missing = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var row in state.GrantedRows)
+        {
+            if (!applied.Contains(row.Collectible)) continue;
+            foreach (string diet in row.Access.Diets)
+                if (!compiledDietIds.Contains(diet)) missing.Add(diet);
+        }
+        if (missing.Count == 0) return true;
+
+        api.Logger.Error("[dietsetup] food-overrides: access.diets names {0}, which was selected but did not compile; "
+            + "all {1} grant(s) from this file were withdrawn. Known compiled diets: {2}.",
+            string.Join(", ", missing), applied.Count,
+            string.Join(", ", compiledDietIds.OrderBy(d => d, StringComparer.Ordinal)));
+
+        foreach (CollectibleObject collectible in applied)
+        {
+            if (state.Owned.TryGetValue(collectible, out FoodNutritionProperties? props)
+                && ReferenceEquals(collectible.NutritionProps, props)) collectible.NutritionProps = null;
+            state.Owned.Remove(collectible);
+            state.Access.Remove(collectible);
+            state.Granted.Remove(collectible);
+        }
+        state.GrantedRows.RemoveAll(row => applied.Contains(row.Collectible));
+        state.RestrictedCount = state.GrantedRows.Count(row => row.Access.Restricts);
+        state.AppliedThisRun.Clear();
+
+        log.Add("[dietsetup] food-overrides: grants withdrawn, 0 applied (a listed diet did not compile)");
+        return false;
+    }
+
     public static List<CollectibleObject> ApplyFromPacket(ICoreClientAPI capi, DietFoodOverridesPacket packet, List<string> log)
     {
         SideState state = GetState(capi);
         var newlyApplied = new List<CollectibleObject>();
-        int alreadyGranted = 0, notFound = 0, catalogMismatch = 0, badCategory = 0, badAccess = 0, restricted = 0;
+        int alreadyGranted = 0, notFound = 0, catalogMismatch = 0, badCategory = 0, restricted = 0;
 
         int count = Math.Min(packet.ItemCodes.Length, Math.Min(packet.Categories.Length, packet.BaseSatiety.Length));
         // An empty column is a sender that predates material permissions; a short one is truncated, and
@@ -438,6 +482,20 @@ public static class FoodOverrideRegistry
             capi.Logger.Error("[dietsetup] food-overrides packet: {0} access value(s) for {1} row(s), whole table refused.",
                 packet.Access.Length, count);
             log.Add("[dietsetup] food-overrides packet: refused, truncated access column");
+            return newlyApplied;
+        }
+
+        // Every permission is decoded before anything is granted. Dropping only the unreadable row would
+        // publish the rest of the table, and a row whose restriction cannot be read must never end up
+        // edible with its restriction missing -- so the candidate table is refused and the prior state kept.
+        var rules = new FoodAccessRule[count];
+        for (int i = 0; i < count; i++)
+        {
+            string encoded = accessCarried ? packet.Access[i] : "";
+            if (FoodAccessRule.TryDecode(encoded, out rules[i])) continue;
+            capi.Logger.Error("[dietsetup] food-overrides packet: item '{0}' has unreadable access '{1}', whole table refused; "
+                + "the previously applied grants are kept.", packet.ItemCodes[i], encoded);
+            log.Add("[dietsetup] food-overrides packet: refused, unreadable access value");
             return newlyApplied;
         }
 
@@ -471,15 +529,7 @@ public static class FoodOverrideRegistry
                 badCategory++;
                 continue;
             }
-            // An unreadable permission is not a licence to eat: the row is dropped, so the client neither
-            // grants the material nor previews it as something this diet may consume.
-            string encoded = accessCarried ? packet.Access[i] : "";
-            if (!FoodAccessRule.TryDecode(encoded, out FoodAccessRule access))
-            {
-                capi.Logger.Warning("[dietsetup] food-overrides packet: item '{0}' has unreadable access '{1}', grant skipped.", itemCode, encoded);
-                badAccess++;
-                continue;
-            }
+            FoodAccessRule access = rules[i];
 
             if (!float.IsFinite(packet.BaseSatiety[i]) || packet.BaseSatiety[i] < 0) continue;
             collectible.NutritionProps = new FoodNutritionProperties
@@ -498,7 +548,7 @@ public static class FoodOverrideRegistry
         }
 
         log.Add($"[dietsetup] food-overrides packet: {newlyApplied.Count} newly applied ({restricted} restricted), {alreadyGranted} already granted, " +
-                $"{notFound} not found, {catalogMismatch} catalog mismatch, {badCategory} bad category, {badAccess} bad access ({count} row(s) received)");
+                $"{notFound} not found, {catalogMismatch} catalog mismatch, {badCategory} bad category ({count} row(s) received)");
         return newlyApplied;
     }
 

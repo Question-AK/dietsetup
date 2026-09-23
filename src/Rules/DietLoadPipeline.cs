@@ -94,6 +94,10 @@ public static class DietLoadPipeline
             compiledTable[id] = compiledDiet;
         }
 
+        // Identity was checked against the selected documents; this is the same check against the diets
+        // that actually survived compilation, and it runs before anything reads the grant table.
+        if (api.Side == EnumAppSide.Server) FoodOverrideRegistry.FinalizeAgainstCompiledDiets(api, compiledTable.Keys, log);
+
         warningCount += LogUnmatchedGrantedItems(tags, log, FoodOverrideRegistry.GrantedCollectibles(api), compiledTable.Values);
         log.Add($"[dietsetup] diets: {compiledTable.Count} loaded, {refused.Count} refused");
         int idColumnWidth = compiledTable.Count == 0 ? 0 : compiledTable.Values.Max(d => d.Id.Length) + 1;
