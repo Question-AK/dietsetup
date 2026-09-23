@@ -17,19 +17,28 @@ public class DietFoodOverridesPacket
     [ProtoMember(2)] public string[] Categories = Array.Empty<string>();
     [ProtoMember(3)] public float[] BaseSatiety = Array.Empty<float>();
 
-    public static DietFoodOverridesPacket From(IReadOnlyList<(CollectibleObject Collectible, EnumFoodCategory Category, float BaseSatiety)> rows)
+    /// <summary>Encoded FoodAccessRule per row. An empty array means a sender that predates material
+    /// permissions, which is unrestricted; a short one is a malformed packet, not a permissive one.</summary>
+    [ProtoMember(4)] public string[] Access = Array.Empty<string>();
+
+    public static DietFoodOverridesPacket From(IReadOnlyList<(CollectibleObject Collectible, EnumFoodCategory Category, float BaseSatiety, FoodAccessRule Access)> rows)
     {
         var itemCodes = new string[rows.Count];
         var categories = new string[rows.Count];
         var baseSatiety = new float[rows.Count];
+        var access = new string[rows.Count];
 
         for (int i = 0; i < rows.Count; i++)
         {
             itemCodes[i] = rows[i].Collectible.Code.ToString();
             categories[i] = rows[i].Category.ToString();
             baseSatiety[i] = rows[i].BaseSatiety;
+            access[i] = rows[i].Access.Encode();
         }
 
-        return new DietFoodOverridesPacket { ItemCodes = itemCodes, Categories = categories, BaseSatiety = baseSatiety };
+        return new DietFoodOverridesPacket
+        {
+            ItemCodes = itemCodes, Categories = categories, BaseSatiety = baseSatiety, Access = access
+        };
     }
 }

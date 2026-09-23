@@ -41,14 +41,16 @@ public static class DietLoadPipeline
         var log = new List<string>();
         int warningCount = 0;
         var tags = new FoodTagRegistry();
-        if (api.Side == EnumAppSide.Server) FoodOverrideRegistry.LoadApplyAndLog(api, log);
+        var refused = new List<(string Id, DietValidationMessage Reason)>();
+        // Diet documents are selected first only so grant permissions can be validated against real diet
+        // ids. Compilation still runs after grants, because ResolveStaticTags counts granted collectibles.
+        Dictionary<string, (DietDocumentFile Doc, string Domain)> raw = LoadDietDocuments(api, log, refused);
+        if (api.Side == EnumAppSide.Server) FoodOverrideRegistry.LoadApplyAndLog(api, log, raw.Keys);
         FoodOverrideRegistry.SetEnabled(api, config.EnableDietSystem);
         LoadTags(api, tags, log);
         tags.ResolveStaticTags(api);
         var composition = LoadComposition(api, tags, log);
         composition.ResolveStatic(api);
-        var refused = new List<(string Id, DietValidationMessage Reason)>();
-        Dictionary<string, (DietDocumentFile Doc, string Domain)> raw = LoadDietDocuments(api, log, refused);
         var compiledTable = new Dictionary<string, CompiledDiet>();
 
         var rawDocs = raw.ToDictionary(kv => kv.Key, kv => kv.Value.Doc);
