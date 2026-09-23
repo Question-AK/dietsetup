@@ -19,12 +19,13 @@ public static class DietSpoilageSatietyPatch
             && ReferenceEquals(operation.Entity, byEntity))
         {
             operation.Pending.Clear();
-            operation.Pending.Enqueue(set.WithGroup(operation.CreditGroup ?? new object()));
+            var credited = set.WithGroup(operation.CreditGroup ?? new object());
+            operation.Pending.Enqueue(credited);
             var props = Vintagestory.GameContent.BlockLiquidContainerBase.GetContainableProps(stack)?.NutritionPropsPerLitre ?? stack.Collectible.NutritionProps;
             if (props != null)
             {
                 operation.TraceQueue.Clear();
-                operation.TraceQueue.Enqueue(DietDiagnostics.Row(operation.Snapshot, byEntity, stack, spoilState, set,
+                operation.TraceQueue.Enqueue(DietDiagnostics.Row(operation.Snapshot, byEntity, stack, spoilState, credited,
                     props.FoodCategory, props.Satiety * __result));
             }
         }

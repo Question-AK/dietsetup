@@ -34,13 +34,21 @@ internal static class DietSpoilageResolution
         return new RestoreContext(() => { pie = previous; scopeDepth--; ClearCache(); });
     }
 
-    /// <summary><paramref name="vanillaSatLoss"/> is vanilla's own spoilage multiplier, known only inside
-    /// the FoodSpoilageSatLossMul postfix. Later callers in the same mouthful hit the cache, so the
-    /// contribution weights are computed once from the real value.</summary>
-    internal static bool TryResolve(float spoilState, ItemStack? stack, EntityAgent? entity,
-        out DietContributionSet set, float vanillaSatLoss = 1f)
+    /// <summary>Memoises one mouthful outside a consumption, so a preview resolves the same set every
+    /// query instead of rebuilding one whose spoilage weight nothing has observed yet.</summary>
+    internal static IDisposable ResolveScope()
     {
-        set = DietContributionSet.Single(Neutral, 0, vanillaSatLoss);
+        scopeDepth++;
+        return new RestoreContext(() => { scopeDepth--; ClearCache(); });
+    }
+
+    /// <summary><paramref name="vanillaSatLoss"/> is vanilla's own spoilage multiplier, known only inside
+    /// the FoodSpoilageSatLossMul postfix. It is recorded on the set rather than baked into it, so the
+    /// weighting no longer depends on whether health, satiety or a preview asked first.</summary>
+    internal static bool TryResolve(float spoilState, ItemStack? stack, EntityAgent? entity,
+        out DietContributionSet set, float? vanillaSatLoss = null)
+    {
+        set = DietContributionSet.Single(Neutral, 0);
         var snapshot = DietRuntimeSnapshot.For(entity?.Api);
         if (!snapshot.Config.EnableDietSystem || stack?.Collectible == null) return false;
         var diet = DietIdResolver.ResolveDiet(entity, snapshot);
@@ -53,10 +61,12 @@ internal static class DietSpoilageResolution
             && ReferenceEquals(cachedPie, pie) && cachedSpoil == spoilState)
         {
             set = cachedResult;
+            if (vanillaSatLoss is { } observed) set.Spoilage.Capture(observed);
             return true;
         }
-        set = snapshot.Composition.Build(snapshot.Tags, diet, stack.Collectible, mask, spoilState, vanillaSatLoss,
-            DietAcaIntegration.HasRealContributions(stack));
+        set = snapshot.Composition.Build(snapshot.Tags, diet, stack.Collectible, mask, spoilState,
+            DietSourceAttributionRegistry.For(stack));
+        if (vanillaSatLoss is { } vanilla) set.Spoilage.Capture(vanilla);
         if (scopeDepth == 0 && DietConsumption.Current == null) return true;
         cachedMask = mask;
         cachedStack = stack;

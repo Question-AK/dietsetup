@@ -109,7 +109,7 @@ public static class DietMealContentNutritionPatch
                     rows.Add(new FoodNutritionProperties { FoodCategory = expanded.FoodCategory, Satiety = expanded.Satiety, Health = expanded.Health });
                 rows.Add(props);
 
-                var finalResult = ingredientResolved ?? DietContributionSet.Single(DietSpoilageResolution.Neutral, 0, 1f);
+                var finalResult = ingredientResolved ?? DietContributionSet.Single(DietSpoilageResolution.Neutral, 0);
                 // One group per physical ingredient: virtual portions and expanded rows share its consequences.
                 var grouped = finalResult.WithGroup(new object());
                 foreach (FoodNutritionProperties row in rows)

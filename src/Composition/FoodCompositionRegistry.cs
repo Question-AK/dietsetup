@@ -190,31 +190,45 @@ public sealed class FoodCompositionRegistry
         if (frozen) throw new InvalidOperationException("Published food composition cannot be modified.");
     }
 
-    /// <summary>Builds the contributions for one mouthful. Real contributions always win: when the caller
-    /// already has usable per-identity contributions, the declared approximation is skipped entirely.</summary>
+    /// <summary>Builds the contributions for one mouthful. Real source-attributed contributions always
+    /// win: when the runtime already knows what the food is made of, the declared approximation is
+    /// skipped entirely.</summary>
     public DietContributionSet Build(FoodTagRegistry tags, CompiledDiet diet, CollectibleObject collectible,
-        ulong mask, float spoilLevel, float vanillaSatLoss, bool realContributionsAvailable, object? group = null)
+        ulong mask, float spoilLevel, DietSourceAttribution attribution = default, object? group = null)
     {
         DietResolveResult whole = DietResolver.Resolve(diet, mask, spoilLevel);
-        CompiledComposition? entry = realContributionsAvailable ? null : For(collectible);
-        if (entry == null) return DietContributionSet.Single(whole, mask, vanillaSatLoss, group);
-
-        var components = new List<DietContribution>(entry.Shares.Length + 1);
-        foreach ((string tag, float share) in entry.Shares)
-        {
-            ulong portionMask = tags.PortionMask(mask, tag);
-            components.Add(new DietContribution(share, DietResolver.Resolve(diet, portionMask, spoilLevel),
-                tag, portionMask, DietContributionBasis.Approximated));
-        }
-        if (entry.UnresolvedRemainder > Tolerance)
-            components.Add(new DietContribution(entry.UnresolvedRemainder, Neutral, "unresolved", mask,
-                DietContributionBasis.Unresolved));
-        return DietContributionSet.Composite(components, whole, mask, vanillaSatLoss, group);
+        if (attribution.HasContributions)
+            return Split(tags, diet, mask, spoilLevel, attribution.Shares, DietContributionBasis.Actual, whole, group);
+        CompiledComposition? entry = For(collectible);
+        if (entry == null) return DietContributionSet.Single(whole, mask, group);
+        return Split(tags, diet, mask, spoilLevel, entry.Shares, DietContributionBasis.Approximated, whole, group);
     }
 
-    /// <summary>An unresolved portion passes upstream nourishment through untouched so no broad rule --
-    /// freshness in particular -- reaches a portion no identity was ever claimed for. Its category
-    /// capacity still applies, because that comes from the category, not from this result.</summary>
+    private static DietContributionSet Split(FoodTagRegistry tags, CompiledDiet diet, ulong mask, float spoilLevel,
+        ImmutableArray<(string Tag, float Share)> shares, DietContributionBasis basis, DietResolveResult whole, object? group)
+    {
+        var components = new List<DietContribution>(shares.Length + 1);
+        float claimed = 0f;
+        foreach ((string tag, float share) in shares)
+        {
+            // A share on a tag that is not a source identity would silently resolve as the item itself
+            // and look like a working split; leave it unresolved instead.
+            if (!tags.IsSourceTag(tag)) continue;
+            ulong portionMask = tags.PortionMask(mask, tag);
+            components.Add(new DietContribution(share, DietResolver.Resolve(diet, portionMask, spoilLevel),
+                tag, portionMask, basis));
+            claimed += share;
+        }
+        float remainder = Math.Max(0f, 1f - claimed);
+        if (remainder > Tolerance)
+            components.Add(new DietContribution(remainder, Neutral, "unresolved", mask, DietContributionBasis.Unresolved));
+        return DietContributionSet.Composite(components, whole, mask, group);
+    }
+
+    /// <summary>An unresolved portion preserves upstream nourishment, ordinary spoilage included, and
+    /// bypasses dietary source and freshness responses so no broad rule reaches a portion no identity
+    /// was ever claimed for. Racial category capacity still applies: that comes from the category, not
+    /// from this result. Neutral is not a restoration of spoiled food to fresh nourishment.</summary>
     internal static readonly DietResolveResult Neutral =
         new(DietVerdict.Edible, 1f, 1f, Array.Empty<CompiledEffect>(), matched: false, replacesSpoilage: false, winningRule: "unresolved");
 }

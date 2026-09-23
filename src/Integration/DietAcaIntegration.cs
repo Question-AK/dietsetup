@@ -60,9 +60,10 @@ internal static class DietAcaIntegration
     private static float[]? Sats(ItemStack? stack) =>
         (stack?.Attributes?[SatsAttribute] as FloatArrayAttribute)?.value is { Length: 6 } value ? value : null;
 
-    /// <summary>True when the runtime already has real per-category contributions for this stack, which
-    /// makes any declared approximation for it inapplicable.</summary>
-    internal static bool HasRealContributions(ItemStack? stack)
+    /// <summary>True when the stack carries ACA's per-nutrient-category totals. These say which hunger
+    /// bars to credit and nothing about what the food is made of, so they are not source-attributed
+    /// contributions and never displace a declared approximation; see Task 4B.</summary>
+    internal static bool HasCategoryTotals(ItemStack? stack)
     {
         Probe();
         if (rawFoodType == null || stack?.Collectible == null || !rawFoodType.IsInstanceOfType(stack.Collectible)) return false;
@@ -75,7 +76,7 @@ internal static class DietAcaIntegration
     /// <summary>ACA's own row expansion, so the rows Diet Setup resolves are exactly the rows ACA credits.</summary>
     internal static FoodNutritionProperties[] ExpandedRows(ItemStack? stack)
     {
-        if (!HasRealContributions(stack)) return Array.Empty<FoodNutritionProperties>();
+        if (!HasCategoryTotals(stack)) return Array.Empty<FoodNutritionProperties>();
         try
         {
             return propsFromArray!.Invoke(stack!.Collectible, new object?[] { Sats(stack) })

@@ -114,21 +114,18 @@ internal static class DietDiagnostics
                 var content = stack.Collectible is BlockLiquidContainerBase liquid && !liquid.IsEmpty(stack) ? liquid.GetContent(stack) : stack;
                 if (content == null) return "No liquid contents.";
                 var contentSlot = ReferenceEquals(content, stack) ? slot : new DummySlot(content, slot.Inventory);
-                ulong mask = snapshot.Tags.GetTagMask(api.World, contentSlot, out float spoil, out bool determined);
+                snapshot.Tags.GetTagMask(api.World, contentSlot, out float spoil, out bool determined);
                 if (!determined) return "Spoilage unavailable; retry after the transition error is resolved.";
-                var diet = DietIdResolver.ResolveDiet(entity, snapshot);
-                if (diet == null) return "No compiled diet.";
+                if (DietIdResolver.ResolveDiet(entity, snapshot) == null) return "No compiled diet.";
                 var props = stack.Collectible.GetNutritionProperties(api.World, stack, entity);
                 if (props == null) return "No nutrition properties.";
                 float satiety = props.Satiety;
-                float vanilla = 1f;
-                if (ReferenceEquals(content, stack))
-                {
-                    vanilla = Vintagestory.API.Config.GlobalConstants.FoodSpoilageSatLossMul(spoil, stack, entity);
-                    satiety *= vanilla;
-                }
-                var set = snapshot.Composition.Build(snapshot.Tags, diet, content.Collectible, mask, spoil, vanilla,
-                    DietAcaIntegration.HasRealContributions(content));
+                using var resolveScope = DietSpoilageResolution.ResolveScope();
+                // Priming the spoilage hook records vanilla's multiplier on the memoised set, so a
+                // preview weights a composite exactly as the eaten mouthful will.
+                float vanilla = Vintagestory.API.Config.GlobalConstants.FoodSpoilageSatLossMul(spoil, content, entity);
+                if (ReferenceEquals(content, stack)) satiety *= vanilla;
+                if (!DietSpoilageResolution.TryResolve(spoil, content, entity, out var set)) return "No compiled diet.";
                 Row(snapshot, entity, content, spoil, set, props.FoodCategory, satiety);
             }
             return rows.Count == 0 ? "No nutritious ingredients." : string.Join("\n", rows.Select(row => row.Format()));
