@@ -35,6 +35,10 @@ internal static class DietAcaExpandedFoodPatch
 
         __state = DietConsumption.Begin(byEntity);
         if (__state == null) return;
+        // Captured before ACA credits anything, so a refused base eat is told apart from a mouthful
+        // whose outcome this site never observed; only the first may withdraw ACA's pre-base rows.
+        __state.Stack = stack;
+        __state.InitialCount = stack.StackSize;
         var group = new object();
         __state.CreditGroup = group;
         if (rows.Length == 0) return;
@@ -50,8 +54,9 @@ internal static class DietAcaExpandedFoodPatch
         if (!DietSpoilageResolution.TryResolve(spoil, stack, byEntity, out var resolved)) return;
 
         // The rows carry per-category nourishment but no identity of their own, so each resolves
-        // against the item's own tags and keeps its upstream category. A declared composition
-        // therefore splits every row by the same shares: expandedSats records no per-category origin.
+        // against the item's own tags and keeps its upstream category. Splitting every row by the
+        // same declared shares is the selected approximation; expandedSats records no origin to
+        // prefer any other, and upstream categories and totals are preserved either way.
         foreach (var row in rows)
         {
             var set = resolved.WithGroup(group);
@@ -62,7 +67,8 @@ internal static class DietAcaExpandedFoodPatch
     }
 
     internal static void Postfix(bool __runOriginal, DietConsumption? __state) =>
-        __state?.Confirm(__runOriginal && __state.Stack != null && __state.Stack.StackSize == __state.InitialCount - 1);
+        __state?.Confirm(__runOriginal && __state.Stack != null && __state.Stack.StackSize == __state.InitialCount - 1
+            ? DietConsumptionOutcome.Consumed : DietConsumptionOutcome.Refused);
 
     internal static void Finalizer(DietConsumption? __state) => __state?.Dispose();
 }

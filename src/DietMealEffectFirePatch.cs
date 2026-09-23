@@ -18,7 +18,8 @@ internal static class DietMealEffectFirePatch
     [HarmonyPostfix]
     private static void Postfix(float remainingServings, float __result, bool __runOriginal, DietConsumption? __state)
     {
-        __state?.Confirm(__runOriginal && __result < remainingServings);
+        __state?.Confirm(__runOriginal && __result < remainingServings
+            ? DietConsumptionOutcome.Consumed : DietConsumptionOutcome.Refused);
     }
 
     [HarmonyFinalizer]

@@ -45,7 +45,10 @@ internal static class DietEatResolvePatch
     [HarmonyPostfix]
     private static void Postfix(bool __runOriginal, DietConsumption? __state)
     {
-        __state?.Confirm(__runOriginal && __state.Stack != null && __state.Stack.StackSize == __state.InitialCount - 1);
+        __state?.Confirm(!__runOriginal ? DietConsumptionOutcome.Refused
+            : __state.Stack == null ? DietConsumptionOutcome.Unknown
+            : __state.Stack.StackSize == __state.InitialCount - 1 ? DietConsumptionOutcome.Consumed
+            : DietConsumptionOutcome.Refused);
     }
 
     [HarmonyFinalizer]

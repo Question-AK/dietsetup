@@ -21,7 +21,8 @@ internal static class DietLiquidConsumptionPatch
 
     [HarmonyPostfix]
     private static void Postfix(bool __runOriginal, DietConsumption? __state) =>
-        __state?.Confirm(__runOriginal && __state.RemovedLiquid > 0);
+        __state?.Confirm(__runOriginal && __state.RemovedLiquid > 0
+            ? DietConsumptionOutcome.Consumed : DietConsumptionOutcome.Refused);
 
     [HarmonyFinalizer]
     private static void Finalizer(DietConsumption? __state) => __state?.Dispose();

@@ -3,8 +3,14 @@ using System.Collections.Generic;
 using dietsetup.Composition;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.GameContent;
 
 namespace dietsetup;
+
+/// <summary>What a delivery site established about the mouthful. <c>Unknown</c> is not <c>Refused</c>:
+/// a site that never captured the stack (no compiled diet, undetermined tag mask) cannot say a
+/// credited mouthful was refused, and must not withdraw one.</summary>
+internal enum DietConsumptionOutcome { Unknown, Consumed, Refused }
 
 internal sealed class DietConsumption : IDisposable
 {
@@ -18,6 +24,9 @@ internal sealed class DietConsumption : IDisposable
     internal DietIngredientTrace? ActiveTrace;
     internal readonly List<DietIngredientTrace> Traces = new();
     private readonly List<DietContributionSet> credited = new();
+    private readonly List<Provisional> submitted = new();
+    private float submittedHealth;
+    private DietConsumptionOutcome outcome;
     internal ItemStack? Stack;
     internal int InitialCount;
     internal int RemovedLiquid;
@@ -59,8 +68,18 @@ internal sealed class DietConsumption : IDisposable
         return true;
     }
 
-    internal void Confirm(bool consumed)
+    /// <summary>A delivery site can submit nourishment before the mouthful is settled: ACA credits its
+    /// expanded rows, and heals, before base eating decides anything. Recording each submission lets an
+    /// unconsumed transaction take back exactly what it saw credited, and nothing else.</summary>
+    internal void RecordSubmission(EnumFoodCategory category, float level, float saturation, float lossDelay) =>
+        submitted.Add(new Provisional(category, level, saturation, lossDelay));
+
+    internal void RecordHealth(float delta) => submittedHealth += delta;
+
+    internal void Confirm(DietConsumptionOutcome outcome)
     {
+        this.outcome = outcome;
+        bool consumed = outcome == DietConsumptionOutcome.Consumed;
         if (Snapshot.Config.RecordLastConsumption)
             Entity.Api.ModLoader.GetModSystem<DietSetupModSystem>().RecordConsumption(Entity.EntityId,
                 $"consumed={consumed}\n" + string.Join("\n", Traces.ConvertAll(row => row.Format())));
@@ -75,6 +94,7 @@ internal sealed class DietConsumption : IDisposable
 
     public void Dispose()
     {
+        if (outcome == DietConsumptionOutcome.Refused) Withdraw();
         DietSpoilageResolution.ClearCache();
         Pending.Clear();
         credited.Clear();
@@ -83,4 +103,50 @@ internal sealed class DietConsumption : IDisposable
         ActiveTrace = null;
         if (ReferenceEquals(current, this)) current = previous;
     }
+
+    private void Withdraw()
+    {
+        if (submittedHealth != 0f && Entity.GetBehavior<EntityBehaviorHealth>() is { } health)
+            health.Health -= submittedHealth;
+        submittedHealth = 0f;
+        if (submitted.Count == 0) return;
+        var hunger = Entity.GetBehavior<EntityBehaviorHunger>();
+        if (hunger == null) { submitted.Clear(); return; }
+        // Reverse order, because the loss delay each submission overwrote is a running maximum.
+        for (int i = submitted.Count - 1; i >= 0; i--)
+        {
+            var row = submitted[i];
+            hunger.Saturation -= row.Saturation;
+            SetLevel(hunger, row.Category, DietDiagnostics.Level(hunger, row.Category) - row.Level);
+            SetLossDelay(hunger, row.Category, row.LossDelay);
+        }
+        submitted.Clear();
+        hunger.UpdateNutrientHealthBoost();
+    }
+
+    private static void SetLevel(EntityBehaviorHunger hunger, EnumFoodCategory category, float value)
+    {
+        switch (category)
+        {
+            case EnumFoodCategory.Fruit: hunger.FruitLevel = value; break;
+            case EnumFoodCategory.Vegetable: hunger.VegetableLevel = value; break;
+            case EnumFoodCategory.Protein: hunger.ProteinLevel = value; break;
+            case EnumFoodCategory.Grain: hunger.GrainLevel = value; break;
+            case EnumFoodCategory.Dairy: hunger.DairyLevel = value; break;
+        }
+    }
+
+    private static void SetLossDelay(EntityBehaviorHunger hunger, EnumFoodCategory category, float value)
+    {
+        switch (category)
+        {
+            case EnumFoodCategory.Fruit: hunger.SaturationLossDelayFruit = value; break;
+            case EnumFoodCategory.Vegetable: hunger.SaturationLossDelayVegetable = value; break;
+            case EnumFoodCategory.Protein: hunger.SaturationLossDelayProtein = value; break;
+            case EnumFoodCategory.Grain: hunger.SaturationLossDelayGrain = value; break;
+            case EnumFoodCategory.Dairy: hunger.SaturationLossDelayDairy = value; break;
+        }
+    }
+
+    private readonly record struct Provisional(EnumFoodCategory Category, float Level, float Saturation, float LossDelay);
 }

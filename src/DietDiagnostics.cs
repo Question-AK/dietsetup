@@ -139,4 +139,13 @@ internal static class DietDiagnostics
         EnumFoodCategory.Grain => hunger.GrainLevel, EnumFoodCategory.Protein => hunger.ProteinLevel,
         EnumFoodCategory.Dairy => hunger.DairyLevel, _ => 0
     };
+
+    internal static float LossDelay(EntityBehaviorHunger hunger, EnumFoodCategory category) => category switch
+    {
+        EnumFoodCategory.Fruit => hunger.SaturationLossDelayFruit,
+        EnumFoodCategory.Vegetable => hunger.SaturationLossDelayVegetable,
+        EnumFoodCategory.Grain => hunger.SaturationLossDelayGrain,
+        EnumFoodCategory.Protein => hunger.SaturationLossDelayProtein,
+        EnumFoodCategory.Dairy => hunger.SaturationLossDelayDairy, _ => 0
+    };
 }
