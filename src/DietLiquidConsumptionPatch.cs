@@ -1,3 +1,4 @@
+using dietsetup.Grants;
 using HarmonyLib;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -10,13 +11,18 @@ namespace dietsetup;
 internal static class DietLiquidConsumptionPatch
 {
     [HarmonyPrefix]
-    private static void Prefix(BlockLiquidContainerBase __instance, float secondsUsed, ItemSlot slot,
+    private static bool Prefix(BlockLiquidContainerBase __instance, float secondsUsed, ItemSlot slot,
         EntityAgent byEntity, out DietConsumption? __state)
     {
         __state = null;
-        if (secondsUsed < 0.95f || slot?.Itemstack == null || __instance.IsEmpty(slot.Itemstack)) return;
+        if (secondsUsed < 0.95f || slot?.Itemstack == null || __instance.IsEmpty(slot.Itemstack)) return true;
+        // Denied before SplitStackAndPerformAction, so the vessel keeps its liquid rather than losing a
+        // portion to a mouthful that was refused. An empty vessel falls through to the base method, which
+        // carries its own gate.
+        if (MaterialPermissionGate.Refuses(byEntity, slot.Itemstack)) return false;
         __state = DietConsumption.Begin(byEntity);
         if (__state != null) __state.CapturingLiquid = true;
+        return true;
     }
 
     [HarmonyPostfix]

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using Vintagestory.API.Common;
@@ -19,6 +20,7 @@ internal static class DietAcaIntegration
     private const string RawFoodType = "ACulinaryArtillery.ItemExpandedRawFood";
     private const string FoodType = "ACulinaryArtillery.ItemExpandedFood";
     private const string SatsAttribute = "expandedSats";
+    private const string MadeWithAttribute = "madeWith";
 
     private static bool probed;
     private static Type? rawFoodType;
@@ -76,6 +78,12 @@ internal static class DietAcaIntegration
         for (int i = 1; i <= 5; i++) if (sats[i] != 0f) return true;
         return false;
     }
+
+    /// <summary>The exact ingredient codes ACA's crafting paths recorded on this stack, read as a plain
+    /// string array so the data is available whether or not ACA is loaded. It establishes membership for
+    /// an explicit material permission and nothing else: it carries no quantities.</summary>
+    internal static IReadOnlyList<string> MadeWithCodes(ItemStack? stack) =>
+        (stack?.Attributes?[MadeWithAttribute] as StringArrayAttribute)?.value ?? Array.Empty<string>();
 
     /// <summary>ACA's own row expansion, so the rows Diet Setup resolves are exactly the rows ACA credits.</summary>
     internal static FoodNutritionProperties[] ExpandedRows(ItemStack? stack)

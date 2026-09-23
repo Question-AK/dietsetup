@@ -1,5 +1,6 @@
 using dietsetup.Binding;
 using dietsetup.Composition;
+using dietsetup.Grants;
 using HarmonyLib;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -22,36 +23,39 @@ internal static class DietAcaExpandedFoodPatch
             finalizer: new HarmonyMethod(AccessTools.Method(typeof(DietAcaExpandedFoodPatch), nameof(Finalizer))));
     }
 
-    internal static void Prefix(float secondsUsed, ItemSlot slot, EntityAgent byEntity, out DietConsumption? __state)
+    internal static bool Prefix(float secondsUsed, ItemSlot slot, EntityAgent byEntity, out DietConsumption? __state)
     {
         __state = null;
-        if (secondsUsed < 0.95f || slot?.Itemstack == null || byEntity?.World is not IServerWorldAccessor) return;
+        if (secondsUsed < 0.95f || slot?.Itemstack == null || byEntity?.World is not IServerWorldAccessor) return true;
+        // Early enough to prevent ACA's own pre-base credits and heals, which it applies before it calls
+        // base -- there is nothing to withdraw because nothing was ever delivered.
+        if (MaterialPermissionGate.Refuses(byEntity, slot.Itemstack)) return false;
         // A nested site is already accounting for this mouthful; joining twice would credit it twice.
-        if (DietConsumption.Join(byEntity) != null) return;
+        if (DietConsumption.Join(byEntity) != null) return true;
 
         var stack = slot.Itemstack;
-        if (stack.Collectible.GetNutritionProperties(byEntity.World, stack, byEntity) == null) return;
+        if (stack.Collectible.GetNutritionProperties(byEntity.World, stack, byEntity) == null) return true;
         var rows = DietAcaIntegration.ExpandedRows(stack);
 
         __state = DietConsumption.Begin(byEntity);
-        if (__state == null) return;
+        if (__state == null) return true;
         // Captured before ACA credits anything, so a refused base eat is told apart from a mouthful
         // whose outcome this site never observed; only the first may withdraw ACA's pre-base rows.
         __state.Stack = stack;
         __state.InitialCount = stack.StackSize;
         var group = new object();
         __state.CreditGroup = group;
-        if (rows.Length == 0) return;
+        if (rows.Length == 0) return true;
 
         var snapshot = __state.Snapshot;
         var diet = DietIdResolver.ResolveDiet(byEntity, snapshot);
-        if (diet == null) return;
+        if (diet == null) return true;
         snapshot.Tags.GetTagMask(byEntity.World, slot, out float spoil, out bool determined);
-        if (!determined) return;
+        if (!determined) return true;
         // Running the spoilage hook first caches the resolve under vanilla's own multiplier, and
         // yields the multiplier ACA itself is about to apply to every row.
         float satietyMul = GlobalConstants.FoodSpoilageSatLossMul(spoil, stack, byEntity);
-        if (!DietSpoilageResolution.TryResolve(spoil, stack, byEntity, out var resolved)) return;
+        if (!DietSpoilageResolution.TryResolve(spoil, stack, byEntity, out var resolved)) return true;
 
         // The rows carry per-category nourishment but no identity of their own, so each resolves
         // against the item's own tags and keeps its upstream category. Splitting every row by the
@@ -64,6 +68,7 @@ internal static class DietAcaExpandedFoodPatch
             __state.TraceQueue.Enqueue(DietDiagnostics.Row(snapshot, byEntity, stack, spoil, set,
                 row.FoodCategory, row.Satiety * satietyMul));
         }
+        return true;
     }
 
     internal static void Postfix(bool __runOriginal, DietConsumption? __state) =>

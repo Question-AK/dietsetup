@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Refused and interrupted mouthfuls no longer leave hunger, nutrition or health behind: an eat that
+  does not happen now grants nothing, including through A Culinary Artillery's expanded foods.
+- Admins can restrict a granted material to named diets. A diet without permission cannot eat it at
+  all -- held food, drink in a vessel, a meal or pie containing it, and an expanded food made with it
+  are each refused before anything is removed or credited, with a short in-game message. Held items
+  say so in their tooltip. This is separate from the Inedible rating, which still means the item is
+  eaten for nothing.
+- A grant file naming a diet that fails to compile now withdraws its grants instead of leaving a
+  material nobody can ever eat, and a grant table that arrives unreadable is refused whole rather
+  than dropping the unreadable row.
+
 ## 1.0.1-rc.1 ? candidate, unpublished
 
 - Snapshot of current development for gameplay acceptance; not an approved stable release.

@@ -1,5 +1,6 @@
 using System.Text;
 using dietsetup.Binding;
+using dietsetup.Grants;
 using dietsetup.Rules;
 using dietsetup.Tags;
 using HarmonyLib;
@@ -27,6 +28,14 @@ public static class DietVerdictTooltipPatch
 
         Entity? viewer = clientWorld.Player?.Entity;
         if (viewer == null) return;
+
+        // Read from the same synchronized table the server enforces, and stated before any edibility
+        // rating: a material this diet may not consume never reaches a verdict.
+        if (MaterialPermissionGate.Denies(world.Api, viewer, inSlot.Itemstack))
+        {
+            dsc.AppendLine(Lang.Get("dietsetup:verdict-denied"));
+            return;
+        }
 
         CompiledDiet? diet = DietIdResolver.ResolveDiet(viewer);
         if (diet == null) return;

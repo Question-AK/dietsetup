@@ -18,10 +18,10 @@ public static class FoodOverrideRegistry
     private const string ModConfigFile = "dietsetup/food-overrides.json";
     private const int MaterialPermissionSchemaVersion = 2;
 
-    /// <summary>Task 5B flips this when consumption enforcement exists. While it is false a
-    /// schemaVersion 2 file is refused whole: accepting permission data without enforcing it would
-    /// hand every diet a material the author restricted.</summary>
-    internal static readonly bool MaterialPermissionEnforcementAvailable = false;
+    /// <summary>The supported consumption paths enforce permissions, so a schemaVersion 2 file is
+    /// accepted. While this is false the file is refused whole: accepting permission data without
+    /// enforcing it would hand every diet a material the author restricted.</summary>
+    internal static readonly bool MaterialPermissionEnforcementAvailable = true;
 
     private static readonly EnumFoodCategory[] AllCategories =
     {
