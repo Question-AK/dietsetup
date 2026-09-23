@@ -12,7 +12,7 @@ public static class DietSpoilageHealthPatch
     [HarmonyPostfix]
     public static void Postfix(float spoilState, ItemStack stack, EntityAgent byEntity, ref float __result)
     {
-        if (DietSpoilageResolution.TryResolve(spoilState, stack, byEntity, out var result))
-            __result = DietSpoilageResolution.ApplyHealth(__result, result);
+        if (DietSpoilageResolution.TryResolve(spoilState, stack, byEntity, out var set))
+            __result = set.Health(__result);
     }
 }

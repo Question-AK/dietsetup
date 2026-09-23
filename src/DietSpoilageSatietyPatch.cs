@@ -12,19 +12,19 @@ public static class DietSpoilageSatietyPatch
     [HarmonyPostfix]
     public static void Postfix(float spoilState, ItemStack stack, EntityAgent byEntity, ref float __result)
     {
-        if (!DietSpoilageResolution.TryResolve(spoilState, stack, byEntity, out var result)) return;
-        __result = DietSpoilageResolution.ApplySatiety(__result, result);
+        float vanilla = __result;
+        if (!DietSpoilageResolution.TryResolve(spoilState, stack, byEntity, out var set, vanilla)) return;
+        __result = set.Satiety(vanilla);
         if (!DietMealFactsContext.DisplayOnly && DietConsumption.Current is { CapturingLiquid: true } operation
             && ReferenceEquals(operation.Entity, byEntity))
         {
             operation.Pending.Clear();
-            operation.Pending.Enqueue(result);
+            operation.Pending.Enqueue(set.WithGroup(operation.CreditGroup ?? new object()));
             var props = Vintagestory.GameContent.BlockLiquidContainerBase.GetContainableProps(stack)?.NutritionPropsPerLitre ?? stack.Collectible.NutritionProps;
             if (props != null)
             {
                 operation.TraceQueue.Clear();
-                operation.TraceQueue.Enqueue(DietDiagnostics.Row(operation.Snapshot, byEntity, stack,
-                    operation.Snapshot.Tags.GetTagMaskForSpoilState(stack.Collectible, spoilState), spoilState, result,
+                operation.TraceQueue.Enqueue(DietDiagnostics.Row(operation.Snapshot, byEntity, stack, spoilState, set,
                     props.FoodCategory, props.Satiety * __result));
             }
         }

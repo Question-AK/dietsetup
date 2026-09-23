@@ -53,6 +53,13 @@ public sealed class FoodTagRegistry
     public static EnumFoodCategory? NutrientBarFor(string sourceTag) =>
         SourceBar.TryGetValue(sourceTag, out EnumFoodCategory bar) ? bar : null;
     public bool TryGetBit(string tag, out int bit) => tagBits.TryGetValue(tag, out bit);
+    public bool IsSourceTag(string tag) => tagAxis.TryGetValue(tag, out FoodTagAxis axis) && axis == FoodTagAxis.Source;
+    /// <summary>A virtual portion's mask: the item's own state and form, with the source axis replaced by
+    /// one component identity, so a baked composite never resolves as its raw inputs.</summary>
+    public ulong PortionMask(ulong itemMask, string componentTag) =>
+        tagBits.TryGetValue(componentTag, out int bit) && tagAxis[componentTag] == FoodTagAxis.Source
+            ? (itemMask & ~sourceAxisMask) | (1UL << bit)
+            : itemMask;
     public void LoadFrom(FoodTagConfigFile file)
     {
         EnsureMutable();

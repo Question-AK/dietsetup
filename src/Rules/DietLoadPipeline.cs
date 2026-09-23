@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using dietsetup.Binding;
+using dietsetup.Composition;
 using dietsetup.Grants;
 using dietsetup.Tags;
 using Newtonsoft.Json;
@@ -33,6 +34,7 @@ public static class DietLoadPipeline
     private const string ModConfigDietsDir = "dietsetup/diets";
     private const string ModConfigBindingsFile = "dietsetup/bindings.json";
     private const string ModConfigFoodTagsFile = "dietsetup/foodtags.json";
+    private const string ModConfigCompositionFile = "dietsetup/food-composition.json";
 
     public static DietLoadResult RunAndLog(ICoreAPI api, DietSetupConfig config)
     {
@@ -43,6 +45,8 @@ public static class DietLoadPipeline
         FoodOverrideRegistry.SetEnabled(api, config.EnableDietSystem);
         LoadTags(api, tags, log);
         tags.ResolveStaticTags(api);
+        var composition = LoadComposition(api, tags, log);
+        composition.ResolveStatic(api);
         var refused = new List<(string Id, DietValidationMessage Reason)>();
         Dictionary<string, (DietDocumentFile Doc, string Domain)> raw = LoadDietDocuments(api, log, refused);
         var compiledTable = new Dictionary<string, CompiledDiet>();
@@ -99,6 +103,7 @@ public static class DietLoadPipeline
         BindingsFile bindings = LoadAndLogBindings(api, log, compiledTable, ref warningCount);
 
         log.Add($"[dietsetup] untagged nutritious collectibles: {tags.UntaggedNutritiousCount}");
+        log.Add($"[dietsetup] composition: {composition.DeclaredCount} declared entry(ies), {composition.MatchedCollectibleCount} collectible(s) matched");
 
         var effective = new EffectiveDietConfiguration
         {
@@ -107,13 +112,14 @@ public static class DietLoadPipeline
             Diets = compiledTable.Keys.ToDictionary(id => id, id => DietExtendsResolver.Resolve(id, rawDocs, out _)!),
             Domains = compiledTable.Keys.ToDictionary(id => id, id => raw[id].Domain),
             Bindings = bindings,
-            Grants = DietFoodOverridesPacket.From(FoodOverrideRegistry.GrantedRows(api))
+            Grants = DietFoodOverridesPacket.From(FoodOverrideRegistry.GrantedRows(api)),
+            Composition = composition.Export()
         };
         string payload = JsonConvert.SerializeObject(effective);
         var owner = api.ModLoader.GetModSystem<DietSetupModSystem>();
         long revision = api.Side == EnumAppSide.Server ? owner.Snapshot.Revision + 1 : 0;
         owner.Publish(new DietRuntimeSnapshot(config, tags, compiledTable, bindings, revision,
-            DietConfigurationPacket.ComputeHash(payload), payload));
+            DietConfigurationPacket.ComputeHash(payload), payload, composition));
         log.Add($"[dietsetup] snapshot revision={revision} hash={owner.Snapshot.Hash}");
         foreach (string line in log) api.Logger.Notification(line);
         return new DietLoadResult(string.Join("\n", log), bindings, compiledTable.Count, refused.Count, warningCount);
@@ -166,6 +172,34 @@ public static class DietLoadPipeline
             log.Add($"[dietsetup] tag '{tag}': ModConfig override wins ({modConfigPath}) over asset ({tagsPath})");
         }
     }
+
+    private static FoodCompositionRegistry LoadComposition(ICoreAPI api, FoodTagRegistry tags, List<string> log)
+    {
+        const string assetPath = "config/food-composition.json";
+        var composition = new FoodCompositionRegistry();
+        var errors = new List<string>();
+        foreach ((AssetLocation loc, FoodCompositionFile file) in api.Assets.GetMany<FoodCompositionFile>(api.Logger, assetPath))
+            composition.LoadFrom(file, loc.ToString(), errors);
+
+        string modConfigPath = Path.Combine(GamePaths.ModConfig, ModConfigCompositionFile);
+        if (api.Side == EnumAppSide.Server && File.Exists(modConfigPath))
+        {
+            try
+            {
+                FoodCompositionFile? file = JsonConvert.DeserializeObject<FoodCompositionFile>(File.ReadAllText(modConfigPath));
+                if (file == null) errors.Add($"{modConfigPath}: empty or invalid, asset composition kept");
+                else composition.LoadFrom(file, modConfigPath, errors);
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{modConfigPath}: failed to parse, asset composition kept: {ex.Message}");
+            }
+        }
+        composition.Validate(tags, errors);
+        foreach (string error in errors) api.Logger.Error("[dietsetup] composition: {0}", error);
+        return composition;
+    }
+
     private static Dictionary<string, (DietDocumentFile Doc, string Domain)> LoadDietDocuments(ICoreAPI api, List<string> log, List<(string Id, DietValidationMessage Reason)> refused)
     {
         var assets = api.Assets.GetMany<DietDocumentFile>(api.Logger, "config/diets/")

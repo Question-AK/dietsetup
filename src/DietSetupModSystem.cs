@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using dietsetup.Binding;
+using dietsetup.Composition;
 using dietsetup.Diet;
 using dietsetup.Grants;
 using dietsetup.Rules;
@@ -72,7 +73,11 @@ public class DietSetupModSystem : ModSystem
             if (patchOwners == 0)
             {
                 harmony = new Harmony(HarmonyId);
-                InstallPatches(harmony, () => harmony.PatchAll(Assembly.GetExecutingAssembly()));
+                InstallPatches(harmony, () =>
+                {
+                    harmony.PatchAll(Assembly.GetExecutingAssembly());
+                    DietAcaExpandedFoodPatch.Install(harmony);
+                });
             }
             patchOwners++;
             ownsPatches = true;
@@ -606,8 +611,15 @@ public class DietSetupModSystem : ModSystem
             FoodOverrideRegistry.ApplyFromPacket(api, effective.Grants, log);
             FoodOverrideRegistry.SetEnabled(api, effective.Config.EnableDietSystem);
             tags.ResolveStaticTags(api);
+            var composition = new FoodCompositionRegistry();
+            var compositionErrors = new List<string>();
+            composition.LoadFrom(effective.Composition ?? new FoodCompositionFile(), "server snapshot", compositionErrors);
+            composition.Validate(tags, compositionErrors);
+            if (compositionErrors.Count > 0)
+                throw new InvalidOperationException($"Server food composition rejected: {string.Join(", ", compositionErrors)}");
+            composition.ResolveStatic(api);
             Publish(new DietRuntimeSnapshot(effective.Config, tags, diets, effective.Bindings,
-                packet.Revision, packet.Hash, packet.Payload));
+                packet.Revision, packet.Hash, packet.Payload, composition));
             api.Logger.Notification("[dietsetup] received server snapshot revision={0} hash={1}", packet.Revision, packet.Hash);
         }
         catch (Exception ex)

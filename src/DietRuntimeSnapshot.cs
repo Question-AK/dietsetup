@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using dietsetup.Binding;
+using dietsetup.Composition;
 using Newtonsoft.Json;
 using dietsetup.Rules;
 using dietsetup.Tags;
@@ -12,10 +13,11 @@ namespace dietsetup;
 internal sealed class DietRuntimeSnapshot
 {
     internal static readonly DietRuntimeSnapshot Empty = new(new DietSetupConfig(), new FoodTagRegistry(),
-        new Dictionary<string, CompiledDiet>(), new BindingsFile(), 0, "", "");
+        new Dictionary<string, CompiledDiet>(), new BindingsFile(), 0, "", "", new FoodCompositionRegistry());
 
     internal DietSetupConfig Config { get; }
     internal FoodTagRegistry Tags { get; }
+    internal FoodCompositionRegistry Composition { get; }
     internal IReadOnlyDictionary<string, CompiledDiet> Diets { get; }
     internal BindingsFile Bindings { get; }
     internal long Revision { get; }
@@ -23,10 +25,13 @@ internal sealed class DietRuntimeSnapshot
     internal string Payload { get; }
 
     internal DietRuntimeSnapshot(DietSetupConfig config, FoodTagRegistry tags,
-        Dictionary<string, CompiledDiet> diets, BindingsFile bindings, long revision, string hash, string payload)
+        Dictionary<string, CompiledDiet> diets, BindingsFile bindings, long revision, string hash, string payload,
+        FoodCompositionRegistry? composition = null)
     {
         config.Validate();
         tags.Freeze();
+        Composition = composition ?? new FoodCompositionRegistry();
+        Composition.Freeze();
         Config = JsonConvert.DeserializeObject<DietSetupConfig>(JsonConvert.SerializeObject(config))!;
         Tags = tags;
         Diets = new ReadOnlyDictionary<string, CompiledDiet>(new Dictionary<string, CompiledDiet>(diets));

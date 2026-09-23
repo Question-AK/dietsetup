@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
-using dietsetup.Rules;
+using dietsetup.Composition;
 using HarmonyLib;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -10,8 +10,12 @@ using Vintagestory.GameContent;
 namespace dietsetup;
 
 // BlockMeal passes the bowl identity to vanilla spoilage; fillings need their own source and the pie's state.
+// A Culinary Artillery replaces this same method with its own prefix and declares no priority, so ownership
+// would otherwise fall to mod load order: this patch wins deterministically and emits ACA's expanded rows itself.
 [HarmonyPatch(typeof(BlockMeal), nameof(BlockMeal.GetContentNutritionProperties),
     new[] { typeof(IWorldAccessor), typeof(ItemSlot), typeof(ItemStack[]), typeof(EntityAgent), typeof(bool), typeof(float), typeof(float) })]
+[HarmonyPriority(Priority.First)]
+[HarmonyBefore(DietAcaIntegration.ModId)]
 public static class DietMealContentNutritionPatch
 {
     [HarmonyPrefix]
@@ -22,7 +26,7 @@ public static class DietMealContentNutritionPatch
 
         var list = new List<FoodNutritionProperties>();
         var ingredientTraces = new List<DietIngredientTrace>();
-        var ingredientResults = new List<DietResolveResult>();
+        var ingredientResults = new List<DietContributionSet>();
         ItemStack? bowlStack = inSlot.Itemstack;
 
         if (contentStacks != null && bowlStack != null)
@@ -85,33 +89,40 @@ public static class DietMealContentNutritionPatch
                 }
                 float ingredientSatietyMult;
                 float ingredientHealthMult;
-                DietResolveResult? ingredientResolved = null;
+                DietContributionSet? ingredientResolved = null;
                 // Vanilla keeps pie fillings fresh and preserves their original codes; the baked pie owns their age and state.
                 if (bowlIsPie) spoilState = pieSpoilLevel;
                 using (DietSpoilageResolution.PieContext(bowlIsPie ? bowlStack : null))
                 {
                     ingredientSatietyMult = GlobalConstants.FoodSpoilageSatLossMul(spoilState, contentStack, forEntity);
                     ingredientHealthMult = GlobalConstants.FoodSpoilageHealthLossMul(spoilState, contentStack, forEntity);
-                    if (DietSpoilageResolution.TryResolve(spoilState, contentStack, forEntity, out DietResolveResult resolved))
+                    if (DietSpoilageResolution.TryResolve(spoilState, contentStack, forEntity, out DietContributionSet resolved))
                     {
                         ingredientResolved = resolved;
                     }
                 }
-                props.Satiety *= ingredientSatietyMult * nutritionMul * quantity;
-                props.Health *= ingredientHealthMult * healthMul * quantity;
-                props.Intoxication *= quantity;
-                props.Psychedelic *= quantity;
-                list.Add(props);
 
-                var finalResult = ingredientResolved ?? new DietResolveResult(
-                    DietVerdict.Edible, 1f, 1f, System.Array.Empty<CompiledEffect>(), false);
-                ingredientResults.Add(finalResult);
-                if (forEntity != null)
+                var rows = new List<FoodNutritionProperties>();
+                // ACA's expanded rows are real per-category contributions of this same ingredient; owning the
+                // method means emitting them here, under one identity resolve and one spoilage application.
+                foreach (FoodNutritionProperties expanded in DietAcaIntegration.ExpandedRows(contentStack))
+                    rows.Add(new FoodNutritionProperties { FoodCategory = expanded.FoodCategory, Satiety = expanded.Satiety, Health = expanded.Health });
+                rows.Add(props);
+
+                var finalResult = ingredientResolved ?? DietContributionSet.Single(DietSpoilageResolution.Neutral, 0, 1f);
+                // One group per physical ingredient: virtual portions and expanded rows share its consequences.
+                var grouped = finalResult.WithGroup(new object());
+                foreach (FoodNutritionProperties row in rows)
                 {
-                    var snapshot = DietRuntimeSnapshot.For(world.Api);
-                    ulong mask = bowlIsPie ? snapshot.Tags.GetPieFillingTagMask(contentStack.Collectible, bowlStack.Collectible, spoilState)
-                        : snapshot.Tags.GetTagMaskForSpoilState(contentStack.Collectible, spoilState);
-                    ingredientTraces.Add(DietDiagnostics.Row(snapshot, forEntity, contentStack, mask, spoilState, finalResult, props.FoodCategory, props.Satiety));
+                    row.Satiety *= ingredientSatietyMult * nutritionMul * quantity;
+                    row.Health *= ingredientHealthMult * healthMul * quantity;
+                    row.Intoxication *= quantity;
+                    row.Psychedelic *= quantity;
+                    list.Add(row);
+                    ingredientResults.Add(grouped);
+                    if (forEntity != null)
+                        ingredientTraces.Add(DietDiagnostics.Row(DietRuntimeSnapshot.For(world.Api), forEntity,
+                            contentStack, spoilState, grouped, row.FoodCategory, row.Satiety));
                 }
             }
         }

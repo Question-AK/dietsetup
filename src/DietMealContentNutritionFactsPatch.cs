@@ -8,6 +8,10 @@ namespace dietsetup;
 // Vanilla omits the viewer on held-meal tooltips; nested or throwing queries must restore the previous display scope.
 [HarmonyPatch(typeof(BlockMeal), nameof(BlockMeal.GetContentNutritionFacts),
     new[] { typeof(IWorldAccessor), typeof(ItemSlot), typeof(ItemStack[]), typeof(EntityAgent), typeof(bool), typeof(float), typeof(float) })]
+// ACA replaces this method too; running first keeps the display-only flag set whichever prefix ends up
+// producing the text, so a preview can never be mistaken for a real meal.
+[HarmonyPriority(Priority.First)]
+[HarmonyBefore(DietAcaIntegration.ModId)]
 public static class DietMealContentNutritionFactsPatch
 {
     [HarmonyPrefix]

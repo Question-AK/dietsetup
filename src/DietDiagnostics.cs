@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using dietsetup.Binding;
+using dietsetup.Composition;
 using dietsetup.Rules;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -25,10 +26,30 @@ internal sealed class DietIngredientTrace
     internal float? SubmittedSatiety;
     internal float? CreditedSatiety;
     internal float? ActualNutrition;
-    internal string Format() => $"{Ingredient}: diet={Diet} snapshot={Snapshot} tags=[{Tags}] spoil={Spoil:F3} rule={Rule} verdict={Verdict} "
+    internal readonly List<DietIngredientTrace> Portions = new();
+    internal float PortionShare = 1f;
+    internal DietContributionBasis Basis = DietContributionBasis.Actual;
+    internal string Contributions = "known";
+
+    private string Core() => $"diet={Diet} snapshot={Snapshot} tags=[{Tags}] spoil={Spoil:F3} rule={Rule} verdict={Verdict} "
         + $"category={Category} satietyContribution={SatietyContribution:F4} nutritionMult={NutritionMultiplier:F4} capacityScale={CapacityScale:F4} "
-        + $"uncappedNutrition={SatietyContribution / 2.5f * NutritionMultiplier * CapacityScale:F4} "
-        + $"submittedSatiety={SubmittedSatiety?.ToString("F4") ?? "not consumed"} creditedSatiety={CreditedSatiety?.ToString("F4") ?? "not consumed"} actualNutrition={ActualNutrition?.ToString("F4") ?? "not consumed"}";
+        + $"uncappedNutrition={SatietyContribution / 2.5f * NutritionMultiplier * CapacityScale:F4}";
+
+    internal string Format()
+    {
+        string head = $"{Ingredient}: {Core()} contributions={Contributions} "
+            + $"submittedSatiety={SubmittedSatiety?.ToString("F4") ?? "not consumed"} creditedSatiety={CreditedSatiety?.ToString("F4") ?? "not consumed"} actualNutrition={ActualNutrition?.ToString("F4") ?? "not consumed"}";
+        if (Portions.Count == 0) return head;
+        return head + "\n" + string.Join("\n", Portions.Select(p =>
+            $"  portion {p.Ingredient} share={p.PortionShare:F4} basis={Basisname(p.Basis)}: {p.Core()}"));
+    }
+
+    private static string Basisname(DietContributionBasis basis) => basis switch
+    {
+        DietContributionBasis.Approximated => "approximated",
+        DietContributionBasis.Unresolved => "unresolved",
+        _ => "actual"
+    };
 }
 
 internal static class DietDiagnostics
@@ -45,6 +66,33 @@ internal static class DietDiagnostics
             SatietyContribution = satiety, NutritionMultiplier = result.Nutrition,
             CapacityScale = diet != null && diet.Categories.TryGetValue(category, out var c) ? c.NutritionGainScale : 1f };
         capture?.Add(row);
+        return row;
+    }
+
+    /// <summary>One row per physical contribution, carrying a portion row per virtual component so a
+    /// report says whether each part was known, approximated or never resolved.</summary>
+    internal static DietIngredientTrace Row(DietRuntimeSnapshot snapshot, EntityAgent entity, ItemStack stack,
+        float spoil, DietContributionSet set, EnumFoodCategory category, float satiety)
+    {
+        var row = Row(snapshot, entity, stack, set.ItemMask, spoil, set.Whole, category, satiety);
+        if (!set.IsComposite) return row;
+        row.NutritionMultiplier = set.Nutrition();
+        row.Rule = "composite";
+        row.Contributions = set.Components.Any(c => c.Basis == DietContributionBasis.Unresolved)
+            ? set.Components.Any(c => c.Basis == DietContributionBasis.Approximated) ? "approximated+unresolved" : "unresolved"
+            : "approximated";
+        foreach (var component in set.Components)
+        {
+            var portion = new DietIngredientTrace
+            {
+                Ingredient = component.Label, Diet = row.Diet, Snapshot = row.Snapshot,
+                Tags = string.Join(",", snapshot.Tags.TagNames(component.Mask)), Spoil = spoil,
+                Rule = component.Result.WinningRule, Verdict = component.Result.Verdict, Category = category,
+                SatietyContribution = satiety * component.Share, NutritionMultiplier = component.Result.Nutrition,
+                CapacityScale = row.CapacityScale, PortionShare = component.Share, Basis = component.Basis
+            };
+            row.Portions.Add(portion);
+        }
         return row;
     }
 
@@ -70,12 +118,18 @@ internal static class DietDiagnostics
                 if (!determined) return "Spoilage unavailable; retry after the transition error is resolved.";
                 var diet = DietIdResolver.ResolveDiet(entity, snapshot);
                 if (diet == null) return "No compiled diet.";
-                var result = DietResolver.Resolve(diet, mask, spoil);
                 var props = stack.Collectible.GetNutritionProperties(api.World, stack, entity);
                 if (props == null) return "No nutrition properties.";
                 float satiety = props.Satiety;
-                if (ReferenceEquals(content, stack)) satiety *= Vintagestory.API.Config.GlobalConstants.FoodSpoilageSatLossMul(spoil, stack, entity);
-                Row(snapshot, entity, content, mask, spoil, result, props.FoodCategory, satiety);
+                float vanilla = 1f;
+                if (ReferenceEquals(content, stack))
+                {
+                    vanilla = Vintagestory.API.Config.GlobalConstants.FoodSpoilageSatLossMul(spoil, stack, entity);
+                    satiety *= vanilla;
+                }
+                var set = snapshot.Composition.Build(snapshot.Tags, diet, content.Collectible, mask, spoil, vanilla,
+                    DietAcaIntegration.HasRealContributions(content));
+                Row(snapshot, entity, content, spoil, set, props.FoodCategory, satiety);
             }
             return rows.Count == 0 ? "No nutritious ingredients." : string.Join("\n", rows.Select(row => row.Format()));
         }

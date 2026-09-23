@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using dietsetup.Binding;
+using dietsetup.Composition;
 using dietsetup.Grants;
 using dietsetup.Rules;
 using dietsetup.Tags;
@@ -42,4 +43,5 @@ internal sealed class EffectiveDietConfiguration
     public Dictionary<string, string> Domains { get; set; } = new();
     public BindingsFile Bindings { get; set; } = new();
     public DietFoodOverridesPacket Grants { get; set; } = new();
+    public FoodCompositionFile Composition { get; set; } = new();
 }

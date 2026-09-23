@@ -1,8 +1,8 @@
 using dietsetup.Binding;
-using dietsetup.Rules;
 using HarmonyLib;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 
 namespace dietsetup;
 
@@ -15,24 +15,31 @@ internal static class DietEatResolvePatch
     {
         __state = null;
         if (secondsUsed < 0.95f || slot?.Itemstack == null) return;
-        __state = DietConsumption.Begin(byEntity);
-        if (__state == null) return;
-        var snapshot = __state.Snapshot;
+        // An outer delivery site may already own this mouthful; join it rather than shadowing its queue.
+        var joined = DietConsumption.Join(byEntity);
+        __state = joined == null ? DietConsumption.Begin(byEntity) : null;
+        var operation = joined ?? __state;
+        if (operation == null) return;
+        var snapshot = operation.Snapshot;
         var diet = DietIdResolver.ResolveDiet(byEntity, snapshot);
         if (diet == null) return;
         var stack = slot.Itemstack;
         var collectible = stack.Collectible;
         int count = stack.StackSize;
-        ulong mask = snapshot.Tags.GetTagMask(byEntity.World, slot, out float spoil, out bool determined);
+        snapshot.Tags.GetTagMask(byEntity.World, slot, out float spoil, out bool determined);
         if (!determined || !ReferenceEquals(stack, slot.Itemstack) || !ReferenceEquals(collectible, stack.Collectible)
             || count != stack.StackSize) return;
-        __state.Stack = stack;
-        __state.InitialCount = count;
-        var result = DietResolver.Resolve(diet, mask, spoil);
-        __state.Pending.Enqueue(result);
+        operation.Stack = stack;
+        operation.InitialCount = count;
+        // Running the spoilage hook first both yields the submitted satiety and caches the resolve built
+        // from vanilla's own multiplier, which vanilla itself only computes after this prefix returns.
+        float satietyMul = GlobalConstants.FoodSpoilageSatLossMul(spoil, stack, byEntity);
+        if (!DietSpoilageResolution.TryResolve(spoil, stack, byEntity, out var resolved)) return;
+        var set = resolved.WithGroup(operation.CreditGroup ?? new object());
+        operation.Pending.Enqueue(set);
         var props = collectible.GetNutritionProperties(byEntity.World, stack, byEntity);
-        if (props != null) __state.TraceQueue.Enqueue(DietDiagnostics.Row(snapshot, byEntity, stack, mask, spoil, result,
-            props.FoodCategory, props.Satiety * Vintagestory.API.Config.GlobalConstants.FoodSpoilageSatLossMul(spoil, stack, byEntity)));
+        if (props != null) operation.TraceQueue.Enqueue(DietDiagnostics.Row(snapshot, byEntity, stack, spoil, set,
+            props.FoodCategory, props.Satiety * satietyMul));
     }
 
     [HarmonyPostfix]
