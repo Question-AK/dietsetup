@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 1.0.2-beta.1 — first public-beta candidate
+## 1.0.2-dev.1 — development candidate
 
 - Add the approved Cannibalism meat, Primitive Survival fish-egg/caviar, and crabmeat mappings.
 - Give Primitive Survival crabmeat a distinct `shellfish` identity while preserving existing
