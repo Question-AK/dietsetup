@@ -6,6 +6,7 @@
     "blood": [],
     "carrion": ["game:carcass-*", "game:drycarcass-*"],
     "fish": ["game:fish-*", "game:fishraw-*", "game:fishchunk-*", "primitivesurvival:fishfillet-*", "primitivesurvival:jerky-fish-*", "primitivesurvival:curedsmokedmeat-fish-*", "primitivesurvival:smokedmeat-fish-*"],
+    "shellfish": ["primitivesurvival:crabmeat-charred", "primitivesurvival:crabmeat-cooked", "primitivesurvival:crabmeat-partbaked", "primitivesurvival:crabmeat-raw"],
     "insect": ["game:insect-*"],
     "egg": ["game:egg-*"],
     "dairy": ["game:cheese-*", "game:milkportion*", "game:butter-*", "game:curdportion*", "game:curdledmilkportion*", "game:wheycurdportion*", "game:cottagecheeseportion"],

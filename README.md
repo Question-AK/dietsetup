@@ -1,6 +1,6 @@
 # Diet Setup
 
-Current source declares development build **1.0.1-rc.1** for Vintage Story **1.22.6 / .NET 10**. It is an unpublished RC, not a deployed or approved package; the pinned, ModDB-accessible **1.0.0** baseline remains the approved package set. Automated checks use the installed 1.22.6 assemblies. Live singleplayer and dedicated-client gameplay acceptance are still required; newer engine versions are not certified by the dependency minimum.
+Current source declares the first public-beta candidate **1.0.2-beta.1** for Vintage Story **1.22.6 / .NET 10**. It is not published or installed by this build. Automated checks use the installed 1.22.6 assemblies; live acceptance limits are listed below.
 
 ## Install and configure
 
@@ -35,6 +35,13 @@ For standalone testing without RaceFramework, use an account with `controlserver
 `/dietassignrules clear` removes the explicit override and returns to bindings/default. An explicit assignment takes precedence over race traits.
 
 ## Food and spoilage
+
+The beta includes partial compatibility mappings for vanilla food plus selected Cannibalism and
+Primitive Survival foods. Classification is not exhaustive: foods without a source classification
+can still match generic freshness or fallback rules. This does not promise neutral handling or
+blanket Expanded Foods compatibility. The `shellfish` identity is distinct from `fish` and `meat`
+and currently has no shellfish-specific racial rule, so crabmeat keeps the existing generic
+freshness/fallback responses.
 
 One rule wins: priority, number of required tags, then declaration order. Ordinary preference rules multiply vanilla spoilage loss. A rule requiring `fresh`, `spoiled`, or `rotten`, or carrying a satiety/nutrition spoilage curve, explicitly replaces vanilla loss. This preserves ordinary cooked-food decay and the authored Goblin meat/juice responses. No freshness durations or perish transitions are changed.
 

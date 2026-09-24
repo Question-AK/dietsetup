@@ -27,6 +27,9 @@ public sealed class FoodTagRegistry
         ["blood"] = EnumFoodCategory.Protein,
         ["carrion"] = EnumFoodCategory.Protein,
         ["fish"] = EnumFoodCategory.Protein,
+        // Shellfish is a distinct identity for compatibility authoring. It deliberately
+        // shares the upstream Protein bar without inheriting fish/meat dietary rules.
+        ["shellfish"] = EnumFoodCategory.Protein,
         ["insect"] = EnumFoodCategory.Protein,
         ["egg"] = EnumFoodCategory.Protein,
         ["dairy"] = EnumFoodCategory.Dairy,

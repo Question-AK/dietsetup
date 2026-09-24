@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.0.2-beta.1 — first public-beta candidate
+
+- Add the approved Cannibalism meat, Primitive Survival fish-egg/caviar, and crabmeat mappings.
+- Give Primitive Survival crabmeat a distinct `shellfish` identity while preserving existing
+  generic freshness/fallback responses and upstream Protein nutrition categories.
+- Clarify that blood is already a supported Protein source identity; no blood-food classifications
+  or dietary rules changed in this candidate.
+
 - Refused and interrupted mouthfuls no longer leave hunger, nutrition or health behind: an eat that
   does not happen now grants nothing, including through A Culinary Artillery's expanded foods.
 - Admins can restrict a granted material to named diets. A diet without permission cannot eat it at
