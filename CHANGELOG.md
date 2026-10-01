@@ -6,6 +6,12 @@
 - Changing race or stomach size keeps each nutrition bar's share of the stomach. A Half-Giant with full
   bars who becomes a Human has full Human bars, not five times them. A bar the old diet did not weigh
   starts empty, so switching cannot fill it. Saves from earlier builds have oversized bars cut to full.
+- A mouthful that starts on a full stomach is still eaten where vanilla allows it, but it gives no
+  nutrition. One decision covers every part of the mouthful (meal ingredients, ACA rows, base item).
+  A mouthful that starts just below full still gives the whole item's nutrition; this is not a strict
+  daily nutrition budget.
+- When the stomach gets smaller, satiety above the new maximum is removed on the next hunger tick,
+  attack or meal. Loading a world removes nothing. A larger stomach adds no satiety.
 - `/dietdiag` shows observed MaxHealth as base, `maxhealthExtraPoints` and all modifiers, and the nutrition
   bonus computed from the current bars. It no longer prints `(not set)` from a property 1.22 never writes.
 

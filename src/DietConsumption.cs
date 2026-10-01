@@ -35,12 +35,17 @@ internal sealed class DietConsumption : IDisposable
     /// nested delivery site, so a winning rule's effects fire once for it.</summary>
     internal object? CreditGroup;
     internal bool CapturingLiquid;
+    // One fullness decision per mouthful; a nested site for the same entity belongs to the outer mouthful.
+    private readonly DietConsumption bite;
+    private bool? startedFull;
+    internal bool? StartedFull { get => bite.startedFull; set => bite.startedFull = value; }
 
     private DietConsumption(EntityAgent entity)
     {
         Entity = entity;
         Snapshot = DietRuntimeSnapshot.For(entity.Api);
         previous = current;
+        bite = previous is { } outer && ReferenceEquals(outer.Entity, entity) ? outer.bite : this;
         current = this;
     }
 

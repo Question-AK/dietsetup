@@ -6,12 +6,14 @@ using Vintagestory.GameContent;
 
 namespace dietsetup;
 
-// Keep vanilla's branch, replacing its condition so live config changes also restore the full-stomach guard.
+// Keep vanilla's branch, but judge fullness once per mouthful, at its first credit; live config changes restore vanilla's guard.
 [HarmonyPatch(typeof(EntityBehaviorHunger), nameof(EntityBehaviorHunger.OnEntityReceiveSaturation))]
 public static class DietNutritionGuardTranspiler
 {
     internal static bool KeepGuard(bool full, EntityBehaviorHunger hunger) =>
-        full && !DietRuntimeSnapshot.For(hunger.entity.Api).Config.EnableDietSystem;
+        !DietRuntimeSnapshot.For(hunger.entity.Api).Config.EnableDietSystem ? full
+        : DietConsumption.Current is { StartedFull: bool startedFull } scope && ReferenceEquals(scope.Entity, hunger.entity) ? startedFull
+        : full;
 
     [HarmonyTranspiler]
     public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)

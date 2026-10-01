@@ -19,11 +19,14 @@ public static class DietSaturationScalePatch
         var diet = DietIdResolver.ResolveDiet(__instance.entity, snapshot);
         // Before vanilla clamps this credit to a changed stomach and before the levels below are captured.
         DietNutritionBasis.Reconcile(__instance, diet);
-        if (__instance.entity is EntityAgent agent && DietConsumption.Current?.TryCredit(agent,
-            out float nutritionMult) == true) nutritionGainMultiplier *= nutritionMult;
+        // Before the bite decision and the rollback capture, so a refused mouthful cannot restore removed excess.
+        DietNutritionBasis.BoundSatiety(__instance);
         var operation = ReferenceEquals(DietConsumption.Current?.Entity, __instance.entity) ? DietConsumption.Current : null;
         if (operation != null)
         {
+            // At the first credit, not per credit: one that fills the stomach must not cost the rest of the mouthful.
+            operation.StartedFull ??= __instance.Saturation >= __instance.MaxSaturation;
+            if (operation.TryCredit(operation.Entity, out float nutritionMult)) nutritionGainMultiplier *= nutritionMult;
             // Captured for every credit the open transaction sees, not only traced ones, so a refused
             // mouthful can be withdrawn even where no row was queued for it.
             __state = (operation, operation.ActiveTrace, DietDiagnostics.Level(__instance, foodCat),

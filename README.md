@@ -55,7 +55,7 @@ Nutrition before the bar cap is:
 base satiety ? effective satiety response ? consumed amount ? nutrition response / 2.5 / capacity
 ```
 
-Meals additionally retain vanilla ingredient/recipe quantity and pie baking factors. Capacity zero gives no nutrition and excludes that category from the weighted health average. Capacity determines reciprocal gain and health weight together; rule multipliers still change the effort needed to fill a bar. Full nonzero-category bars give the normal maximum nutrition health bonus of 12.5; no level counts past a full bar. When a race or stomach change alters the maximum saturation, each bar keeps its share of the stomach if both the old and the new diet weigh it, and otherwise starts empty.
+Meals additionally retain vanilla ingredient/recipe quantity and pie baking factors. Capacity zero gives no nutrition and excludes that category from the weighted health average. Capacity determines reciprocal gain and health weight together; rule multipliers still change the effort needed to fill a bar. Full nonzero-category bars give the normal maximum nutrition health bonus of 12.5; no level counts past a full bar. When a race or stomach change alters the maximum saturation, each bar keeps its share of the stomach if both the old and the new diet weigh it, and otherwise starts empty. Fullness is decided once per mouthful, before its first credit: a mouthful that starts full gives no nutrition, and one that starts just below full gives the whole item's nutrition, as in vanilla. Satiety above a smaller stomach is removed on the next hunger tick, attack or meal, not when a world loads; a larger stomach adds no satiety.
 
 ## Commands and reporting
 

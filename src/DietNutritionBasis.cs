@@ -52,6 +52,15 @@ internal static class DietNutritionBasis
         Record(hunger.entity, max, supported);
     }
 
+    /// <summary>Removes satiety above a shrunken stomach; a larger stomach adds none. Not called from
+    /// Initialize, whose MaxSaturation can predate the race's trait stats.</summary>
+    internal static void BoundSatiety(EntityBehaviorHunger hunger)
+    {
+        if (hunger.entity.Api?.Side != EnumAppSide.Server) return;
+        float max = hunger.MaxSaturation;
+        if (max > 0f && float.IsFinite(max) && hunger.Saturation > max) hunger.Saturation = max;
+    }
+
     /// <summary>The diet system is off, so vanilla owns the levels; only follow the stomach so a later
     /// re-enable does not rescale levels vanilla earned against it.</summary>
     internal static void Follow(EntityBehaviorHunger hunger)
