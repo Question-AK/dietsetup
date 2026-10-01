@@ -34,9 +34,10 @@ internal static class MaterialPermissionGate
         CollectibleObject? denied = Denied(api, stack, dietId, 0);
         if (denied == null && contents != null)
         {
+            bool meal = stack?.Collectible is BlockMeal;
             foreach (ItemStack? content in contents)
             {
-                denied = Denied(api, content, dietId, 1);
+                denied = Denied(api, content, dietId, 1, meal);
                 if (denied != null) break;
             }
         }
@@ -65,17 +66,20 @@ internal static class MaterialPermissionGate
         return snapshot.GetDiet(id) != null ? id : null;
     }
 
-    private static CollectibleObject? Denied(ICoreAPI api, ItemStack? stack, string? dietId, int depth)
+    /// <summary>A grant only sets standalone nutrition, so an ingredient the actual nutrition path feeds from
+    /// native in-meal props is not eating the grant. That exempts the ingredient alone, never what it contains.</summary>
+    private static CollectibleObject? Denied(ICoreAPI api, ItemStack? stack, string? dietId, int depth, bool mealIngredient = false)
     {
         if (stack?.Collectible == null || depth > MaxContainmentDepth) return null;
-        if (Refused(api, stack.Collectible, dietId)) return stack.Collectible;
+        if (!(mealIngredient && MealReadsInMealNutrition(stack)) && Refused(api, stack.Collectible, dietId))
+            return stack.Collectible;
 
         // Membership is the only question these codes can answer: no quantity, and never an ordinary
         // nutritional restriction. A code that resolves to nothing is unknown containment, not a denial.
         foreach (string code in DietAcaIntegration.MadeWithCodes(stack))
         {
             CollectibleObject? ingredient = Resolve(api, code);
-            if (ingredient != null && Refused(api, ingredient, dietId)) return ingredient;
+            if (ingredient != null && !HasInMealAttribute(ingredient) && Refused(api, ingredient, dietId)) return ingredient;
         }
 
         if (stack.Collectible is not BlockContainer container) return null;
@@ -85,13 +89,23 @@ internal static class MaterialPermissionGate
         catch (Exception) { return null; }
         if (contents == null) return null;
 
+        bool meal = container is BlockMeal;
         foreach (ItemStack content in contents)
         {
-            CollectibleObject? denied = Denied(api, content, dietId, depth + 1);
+            CollectibleObject? denied = Denied(api, content, dietId, depth + 1, meal);
             if (denied != null) return denied;
         }
         return null;
     }
+
+    // BlockMeal.GetIngredientStackNutritionProperties reads these two before any standalone props.
+    private static bool MealReadsInMealNutrition(ItemStack stack) =>
+        BlockLiquidContainerBase.GetContainableProps(stack)?.NutritionPropsPerLitreWhenInMeal != null
+        || HasInMealAttribute(stack.Collectible);
+
+    // ACA bakes a madeWith ingredient from this attribute before its NutritionProps (GetNutrientsFromIngredient).
+    private static bool HasInMealAttribute(CollectibleObject collectible) =>
+        collectible.Attributes?["nutritionPropsWhenInMeal"].Exists == true;
 
     private static bool Refused(ICoreAPI api, CollectibleObject collectible, string? dietId)
     {
