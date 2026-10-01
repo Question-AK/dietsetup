@@ -40,8 +40,11 @@ public static class DietMealContentNutritionPatch
             }
 
             string recipeCode = bowlStack.Attributes.GetString("recipeCode");
-            List<CookingRecipeIngredient>? recipeIngredients = world.Api.GetCookingRecipe(recipeCode)?.Ingredients?
-                .Select(ing => ing.Clone()).ToList();
+            CookingRecipe? recipe = world.Api.GetCookingRecipe(recipeCode);
+            List<CookingRecipeIngredient>? recipeIngredients = recipe?.Ingredients?.Select(ing => ing.Clone()).ToList();
+            // A pot meal keeps its raw ingredient stacks. ACA mixing-bowl codes are absent from this
+            // registry and were never heated, so they keep the ingredient's own state.
+            bool cookedMeal = !bowlIsPie && recipe != null && recipe.CooksInto == null;
 
             foreach (ItemStack? contentStack in contentStacks)
             {
@@ -92,7 +95,7 @@ public static class DietMealContentNutritionPatch
                 DietContributionSet? ingredientResolved = null;
                 // Vanilla keeps pie fillings fresh and preserves their original codes; the baked pie owns their age and state.
                 if (bowlIsPie) spoilState = pieSpoilLevel;
-                using (DietSpoilageResolution.PieContext(bowlIsPie ? bowlStack : null))
+                using (DietSpoilageResolution.MealContext(bowlIsPie ? bowlStack : null, cookedMeal))
                 {
                     ingredientSatietyMult = GlobalConstants.FoodSpoilageSatLossMul(spoilState, contentStack, forEntity);
                     ingredientHealthMult = GlobalConstants.FoodSpoilageHealthLossMul(spoilState, contentStack, forEntity);

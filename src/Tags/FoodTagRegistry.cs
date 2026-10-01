@@ -10,6 +10,8 @@ public sealed class FoodTagRegistry
     public const int MaxTags = 64;
     public const string FreshTag = "fresh";
     public const string SpoiledTag = "spoiled";
+    public const string RawTag = "raw";
+    public const string CookedTag = "cooked";
 
     private readonly Dictionary<string, int> tagBits = new();
     private readonly Dictionary<string, FoodTagAxis> tagAxis = new();
@@ -220,6 +222,17 @@ public sealed class FoodTagRegistry
         mask |= 1UL << tagBits[spoilLevel > 0f ? SpoiledTag : FreshTag];
         return mask;
     }
+    /// <summary>A heated pot meal keeps its raw ingredient stacks, so only the raw state becomes cooked;
+    /// source, form and any other state (preserved) stay, and an ingredient with no raw tag is unchanged.</summary>
+    public ulong GetCookedIngredientTagMask(CollectibleObject collectible, float spoilLevel)
+    {
+        ulong mask = GetTagMaskForSpoilState(collectible, spoilLevel);
+        if (!TryGetStateBit(RawTag, out int raw) || !TryGetStateBit(CookedTag, out int cooked)
+            || (mask & (1UL << raw)) == 0) return mask;
+        return (mask & ~(1UL << raw)) | (1UL << cooked);
+    }
+    private bool TryGetStateBit(string tag, out int bit) =>
+        tagBits.TryGetValue(tag, out bit) && tagAxis[tag] == FoodTagAxis.State;
     public ulong GetPieFillingTagMask(CollectibleObject fillingCollectible, CollectibleObject pieCollectible, float pieSpoilLevel)
     {
         ulong fillingMask = GetStaticMask(fillingCollectible);

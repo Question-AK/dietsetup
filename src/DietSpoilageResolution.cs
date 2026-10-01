@@ -15,23 +15,29 @@ internal static class DietSpoilageResolution
     [ThreadStatic] private static CompiledDiet? cachedDiet;
     [ThreadStatic] private static float cachedSpoil;
     [ThreadStatic] private static ItemStack? cachedPie;
+    [ThreadStatic] private static bool cachedCookedMeal;
     [ThreadStatic] private static DietContributionSet? cachedResult;
     [ThreadStatic] private static ItemStack? pie;
+    [ThreadStatic] private static bool cookedMeal;
     [ThreadStatic] private static int scopeDepth;
     [ThreadStatic] private static ulong cachedMask;
 
     internal static void ClearCache()
     {
         cachedStack = null; cachedEntity = null; cachedSnapshot = null; cachedDiet = null; cachedPie = null;
-        cachedResult = null;
+        cachedCookedMeal = false; cachedResult = null;
     }
 
-    internal static IDisposable PieContext(ItemStack? stack)
+    /// <summary>One meal ingredient's container: a pie supplies the filling's state, and a heated pot meal
+    /// cooks its raw ingredients. Both are restored on dispose so a later standalone food resolves as itself.</summary>
+    internal static IDisposable MealContext(ItemStack? pieStack, bool cooked)
     {
-        var previous = pie;
-        pie = stack;
+        var previousPie = pie;
+        var previousCooked = cookedMeal;
+        pie = pieStack;
+        cookedMeal = cooked;
         scopeDepth++;
-        return new RestoreContext(() => { pie = previous; scopeDepth--; ClearCache(); });
+        return new RestoreContext(() => { pie = previousPie; cookedMeal = previousCooked; scopeDepth--; ClearCache(); });
     }
 
     /// <summary>Memoises one mouthful outside a consumption, so a preview resolves the same set every
@@ -55,10 +61,12 @@ internal static class DietSpoilageResolution
         if (diet == null) return false;
         ulong mask = pie != null
             ? snapshot.Tags.GetPieFillingTagMask(stack.Collectible, pie.Collectible, spoilState)
-            : snapshot.Tags.GetTagMaskForSpoilState(stack.Collectible, spoilState);
+            : cookedMeal
+                ? snapshot.Tags.GetCookedIngredientTagMask(stack.Collectible, spoilState)
+                : snapshot.Tags.GetTagMaskForSpoilState(stack.Collectible, spoilState);
         if (cachedResult != null && cachedMask == mask && ReferenceEquals(cachedStack, stack) && ReferenceEquals(cachedEntity, entity)
             && ReferenceEquals(cachedSnapshot, snapshot) && ReferenceEquals(cachedDiet, diet)
-            && ReferenceEquals(cachedPie, pie) && cachedSpoil == spoilState)
+            && ReferenceEquals(cachedPie, pie) && cachedCookedMeal == cookedMeal && cachedSpoil == spoilState)
         {
             set = cachedResult;
             if (vanillaSatLoss is { } observed) set.Spoilage.Capture(observed);
@@ -74,6 +82,7 @@ internal static class DietSpoilageResolution
         cachedSnapshot = snapshot;
         cachedDiet = diet;
         cachedPie = pie;
+        cachedCookedMeal = cookedMeal;
         cachedSpoil = spoilState;
         cachedResult = set;
         return true;
