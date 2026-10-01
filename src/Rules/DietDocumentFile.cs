@@ -9,6 +9,8 @@ public class DietDocumentFile : DietAuthoringFile
     public int? SchemaVersion { get; set; }
     public string? Id { get; set; }
     public string? Extends { get; set; }
+    public string? NutritionModel { get; set; }
+    public float? NutritionRequirement { get; set; }
     public Dictionary<string, DietCategoryFile> Categories { get; set; } = new();
     public DietFallbackFile? Fallback { get; set; }
     public DietRuleFileEntry[] Rules { get; set; } = Array.Empty<DietRuleFileEntry>();
@@ -18,6 +20,7 @@ public class DietCategoryFile : DietAuthoringFile
 {
     public float? Capacity { get; set; }
     public float? DrainRate { get; set; }
+    public float? NutritionRequirement { get; set; }
     public float? SatietyMult { get; set; }
     public float? NutritionMult { get; set; }
 }

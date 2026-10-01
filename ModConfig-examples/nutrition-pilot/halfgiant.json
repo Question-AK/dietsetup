@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "halfgiant",
+  "extends": "base",
+  "nutritionModel": "demandNormalised",
+  "nutritionRequirement": 1.0,
+  // Under demandNormalised capacity sets only each bar's health share; the /5.31 from 8e2760c is kept so the shares match.
+  "categories": {
+    "Fruit": { "capacity": 0.151 },
+    "Vegetable": { "capacity": 0.151 },
+    "Grain": { "capacity": 0.188 },
+    "Protein": { "capacity": 0.226 },
+    "Dairy": { "capacity": 0.226 }
+  },
+  "fallback": { "satietyMult": 1.0, "nutritionMult": 1.0 },
+  "rules": [
+    { "requires": ["meat", "cooked"], "priority": 30, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.0 },
+    { "requires": ["dairy"], "priority": 30, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.0 },
+    { "requires": ["grain"], "priority": 20, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.25 }
+  ]
+}

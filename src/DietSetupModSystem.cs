@@ -63,6 +63,7 @@ public class DietSetupModSystem : ModSystem
         api.Logger.Notification("[{0}] Build {1} ({2}{3})", Mod.Info.ModID, Mod.Info.Version,
             GitInfo.Sha, GitInfo.Dirty ? "-dirty" : "");
 
+        DemandNutrition.PlayerModelLibLoaded = api.ModLoader.IsModEnabled("playermodellib");
         if (!api.ModLoader.IsModEnabled("raceframework"))
         {
             api.Logger.Notification("[{0}] raceframework not detected — trait-based diet bindings will never match; running in Mods-solo mode.", Mod.Info.ModID);
@@ -397,12 +398,13 @@ public class DietSetupModSystem : ModSystem
     private string FormatDietShow(CompiledDiet diet)
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"diet '{diet.Id}' (domain '{diet.SourceDomain}')");
+        sb.AppendLine($"diet '{diet.Id}' (domain '{diet.SourceDomain}') nutritionModel={diet.NutritionModel}");
 
         foreach (EnumFoodCategory cat in new[] { EnumFoodCategory.Fruit, EnumFoodCategory.Vegetable, EnumFoodCategory.Grain, EnumFoodCategory.Protein, EnumFoodCategory.Dairy })
         {
             CompiledCategory c = diet.Categories[cat];
-            sb.AppendLine($"  {cat,-10} capacity={c.Capacity:F3} gainScale={c.NutritionGainScale:F3} healthWeight={c.HealthWeight:F3}");
+            string requirement = diet.NutritionModel == NutritionModel.DemandNormalised ? $" requirement={c.NutritionRequirement:F3}" : "";
+            sb.AppendLine($"  {cat,-10} capacity={c.Capacity:F3} gainScale={c.NutritionGainScale:F3} healthWeight={c.HealthWeight:F3}{requirement}");
         }
 
         sb.AppendLine($"  fallback: satietyMult={diet.FallbackSatietyMult:F2} nutritionMult={diet.FallbackNutritionMult:F2}");
@@ -473,6 +475,8 @@ public class DietSetupModSystem : ModSystem
             DietIdResolver.ResolvePath.RaceTrait => $"id={dietId} source=race trait trait={matchedTrait}",
             _ => $"id={dietId} source=default"
         };
+        if (Snapshot.GetDiet(dietId)?.NutritionModel == NutritionModel.DemandNormalised)
+            dietSummary += $" nutritionModel=demandNormalised demand={DemandNutrition.Demand(entity):F2}";
 
         string hungerSummary = hunger == null
             ? "unavailable (no hunger behavior on this entity)"

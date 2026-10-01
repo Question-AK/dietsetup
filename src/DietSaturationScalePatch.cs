@@ -33,8 +33,7 @@ public static class DietSaturationScalePatch
                 __instance.Saturation, DietDiagnostics.LossDelay(__instance, foodCat));
             if (__state.Row != null) __state.Row.SubmittedSatiety = saturation;
         }
-        if (diet != null && diet.Categories.TryGetValue(foodCat, out var category))
-            nutritionGainMultiplier *= category.NutritionGainScale;
+        nutritionGainMultiplier *= DemandNutrition.GainScale(diet, foodCat, __instance);
     }
 
     [HarmonyPostfix]

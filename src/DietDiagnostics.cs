@@ -66,7 +66,7 @@ internal static class DietDiagnostics
             Snapshot = $"{snapshot.Revision}/{snapshot.Hash}", Tags = string.Join(",", snapshot.Tags.TagNames(mask)),
             Spoil = spoil, Rule = result.WinningRule, Verdict = result.Verdict, Category = category,
             SatietyContribution = satiety, NutritionMultiplier = result.Nutrition,
-            CapacityScale = diet != null && diet.Categories.TryGetValue(category, out var c) ? c.NutritionGainScale : 1f };
+            CapacityScale = DemandNutrition.GainScale(diet, category, entity.GetBehavior<EntityBehaviorHunger>()) };
         capture?.Add(row);
         return row;
     }

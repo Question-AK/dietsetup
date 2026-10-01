@@ -62,6 +62,8 @@ public static class DietExtendsResolver
             SchemaVersion = child.SchemaVersion,
             Id = child.Id,
             Extends = child.Extends,
+            NutritionModel = child.NutritionModel ?? parent.NutritionModel,
+            NutritionRequirement = child.NutritionRequirement ?? parent.NutritionRequirement,
             Categories = categories,
             Fallback = child.Fallback ?? parent.Fallback,
             Rules = rules.ToArray(),

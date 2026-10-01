@@ -28,7 +28,12 @@ public static class DietCompiler
             fatal.Add(new DietValidationMessage(1, $"schemaVersion missing or unknown (got {(doc.SchemaVersion?.ToString() ?? "(missing)")})"));
         }
 
-        Dictionary<EnumFoodCategory, CompiledCategory> categories = CompileCategories(id, doc.Categories, capacityFloor, fatal, warnings);
+        TryParseNutritionModel(doc.NutritionModel, out NutritionModel model);
+        // Checked on the merged document: a requirement a legacy diet inherits or sets would be silently ignored.
+        if (model == NutritionModel.Legacy && (doc.NutritionRequirement.HasValue || doc.Categories.Values.Any(c => c.NutritionRequirement.HasValue)))
+            fatal.Add(new DietValidationMessage(0, "nutritionRequirement applies only to nutritionModel 'demandNormalised'"));
+
+        Dictionary<EnumFoodCategory, CompiledCategory> categories = CompileCategories(id, doc.Categories, capacityFloor, model, doc.NutritionRequirement ?? 1f, fatal, warnings);
 
         if (!float.IsFinite(categories.Values.Sum(c => c.Capacity))) fatal.Add(new(0, "total capacity exceeds finite health arithmetic"));
         if (categories.Values.All(c => c.Capacity == 0f))
@@ -56,6 +61,7 @@ public static class DietCompiler
         {
             Id = id,
             SourceDomain = domain,
+            NutritionModel = model,
             Categories = categories.ToImmutableDictionary(),
             FallbackSatietyMult = fallbackSatiety,
             FallbackNutritionMult = fallbackNutrition,
@@ -63,7 +69,7 @@ public static class DietCompiler
         };
     }
 
-    private static Dictionary<EnumFoodCategory, CompiledCategory> CompileCategories(string id, Dictionary<string, DietCategoryFile> categoryFiles, float capacityFloor, List<DietValidationMessage> fatal, List<DietValidationMessage> warnings)
+    private static Dictionary<EnumFoodCategory, CompiledCategory> CompileCategories(string id, Dictionary<string, DietCategoryFile> categoryFiles, float capacityFloor, NutritionModel model, float dietRequirement, List<DietValidationMessage> fatal, List<DietValidationMessage> warnings)
     {
         var result = new Dictionary<EnumFoodCategory, CompiledCategory>();
 
@@ -80,20 +86,20 @@ public static class DietCompiler
                 fatal.Add(new DietValidationMessage(6, $"category '{cat}' sets a rule-scoped multiplier (satietyMult/nutritionMult belong on rules, not categories)"));
             }
 
-            result[cat] = DeriveCategory(id, cat, catFile.Capacity ?? 1f, capacityFloor, warnings);
+            result[cat] = DeriveCategory(id, cat, catFile.Capacity ?? 1f, catFile.NutritionRequirement ?? dietRequirement, model, capacityFloor, warnings);
         }
 
         foreach (EnumFoodCategory cat in AllCategories)
         {
             if (!result.ContainsKey(cat))
             {
-                result[cat] = DeriveCategory(id, cat, 1f, capacityFloor, warnings);
+                result[cat] = DeriveCategory(id, cat, 1f, dietRequirement, model, capacityFloor, warnings);
             }
         }
 
         return result;
     }
-    private static CompiledCategory DeriveCategory(string id, EnumFoodCategory cat, float rawCapacity, float capacityFloor, List<DietValidationMessage> warnings)
+    private static CompiledCategory DeriveCategory(string id, EnumFoodCategory cat, float rawCapacity, float requirement, NutritionModel model, float capacityFloor, List<DietValidationMessage> warnings)
     {
         float capacity = rawCapacity;
         if (rawCapacity > 0f && rawCapacity < capacityFloor)
@@ -102,8 +108,18 @@ public static class DietCompiler
             warnings.Add(new DietValidationMessage(11, $"category '{cat}' capacity {rawCapacity:F3} clamped to floor {capacityFloor:F3}"));
         }
 
-        float gainScale = capacity > 0f ? 1f / capacity : 0f;
-        return new CompiledCategory(capacity, gainScale, capacity);
+        // Capacity still decides support under DemandNormalised, so the requirement cannot feed an unsupported bar.
+        float gainScale = !(capacity > 0f) ? 0f : model == NutritionModel.DemandNormalised ? 1f / requirement : 1f / capacity;
+        return new CompiledCategory(capacity, gainScale, capacity, requirement);
+    }
+
+    public static bool TryParseNutritionModel(string? value, out NutritionModel model)
+    {
+        model = NutritionModel.Legacy;
+        if (value == null || value.Equals("legacy", StringComparison.OrdinalIgnoreCase)) return true;
+        if (!value.Equals("demandNormalised", StringComparison.OrdinalIgnoreCase)) return false;
+        model = NutritionModel.DemandNormalised;
+        return true;
     }
 
     private static CompiledRule? CompileRule(FoodTagRegistry tags, string id, DietRuleFileEntry rf, int declarationIndex, List<DietValidationMessage> fatal, List<DietValidationMessage> warnings)
@@ -348,6 +364,11 @@ public static class DietCompiler
             if (value.HasValue && (!float.IsFinite(value.Value) || (nonnegative && value < 0)))
                 errors.Add($"{path}: expected finite{(nonnegative ? " non-negative" : "")} number");
         }
+        void Requirement(float? value, string path)
+        {
+            if (value.HasValue && !(value > 0f && float.IsFinite(value.Value) && float.IsFinite(1f / value.Value)))
+                errors.Add($"{path}: expected a finite positive number with a finite reciprocal");
+        }
         void Curve(CurveAnchorFile[]? values, string path)
         {
             if (values == null) return;
@@ -364,12 +385,16 @@ public static class DietCompiler
         }
         Object(doc, "diet");
         if (doc == null) return errors;
+        if (!TryParseNutritionModel(doc.NutritionModel, out _))
+            errors.Add($"nutritionModel: unknown model '{doc.NutritionModel}' (expected 'legacy' or 'demandNormalised')");
+        Requirement(doc.NutritionRequirement, "nutritionRequirement");
         if (doc.Categories == null) errors.Add("categories: null object");
         else foreach (var (name, category) in doc.Categories)
         {
             Object(category, $"categories.{name}"); if (category == null) continue;
             Number(category.Capacity, $"categories.{name}.capacity", true);
             if (category.DrainRate.HasValue) errors.Add($"categories.{name}.drainRate: reserved, not supported");
+            Requirement(category.NutritionRequirement, $"categories.{name}.nutritionRequirement");
         }
         if (doc.Fallback != null)
         {
