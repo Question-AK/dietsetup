@@ -124,7 +124,7 @@ internal sealed class DietConsumption : IDisposable
         hunger.UpdateNutrientHealthBoost();
     }
 
-    private static void SetLevel(EntityBehaviorHunger hunger, EnumFoodCategory category, float value)
+    internal static void SetLevel(EntityBehaviorHunger hunger, EnumFoodCategory category, float value)
     {
         switch (category)
         {

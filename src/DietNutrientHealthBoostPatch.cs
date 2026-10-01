@@ -9,23 +9,31 @@ namespace dietsetup;
 [HarmonyPatch(typeof(EntityBehaviorHunger), nameof(EntityBehaviorHunger.UpdateNutrientHealthBoost))]
 public static class DietNutrientHealthBoostPatch
 {
+    public const float MaxBonus = 12.5f;
+
     [HarmonyPrefix]
     public static bool Prefix(EntityBehaviorHunger __instance)
     {
         using var snapshotScope = DietRuntimeSnapshot.Read(__instance.entity.Api);
-        if (!DietRuntimeSnapshot.For(__instance.entity.Api).Config.EnableDietSystem) return true;
+        if (!DietRuntimeSnapshot.For(__instance.entity.Api).Config.EnableDietSystem)
+        {
+            DietNutritionBasis.Follow(__instance);
+            return true;
+        }
 
         CompiledDiet? diet = DietIdResolver.ResolveDiet(__instance.entity);
-        if (diet == null) return true;
-
+        DietNutritionBasis.Reconcile(__instance, diet);
         float bonus = ComputeBonus(diet, __instance);
         __instance.entity.GetBehavior<EntityBehaviorHealth>()?.SetMaxHealthModifiers("nutrientHealthMod", bonus);
 
         return false;
     }
-    public static float ComputeBonus(CompiledDiet diet, EntityBehaviorHunger hunger)
+
+    /// <summary>A null diet weighs all five categories equally, as vanilla does.</summary>
+    public static float ComputeBonus(CompiledDiet? diet, EntityBehaviorHunger hunger)
     {
         float maxSaturation = hunger.MaxSaturation;
+        if (!(maxSaturation > 0f)) return 0f;
         float numerator = 0f;
         float denominator = 0f;
 
@@ -34,14 +42,15 @@ public static class DietNutrientHealthBoostPatch
         AddCategory(diet, EnumFoodCategory.Protein, hunger.ProteinLevel, maxSaturation, ref numerator, ref denominator);
         AddCategory(diet, EnumFoodCategory.Grain, hunger.GrainLevel, maxSaturation, ref numerator, ref denominator);
         AddCategory(diet, EnumFoodCategory.Dairy, hunger.DairyLevel, maxSaturation, ref numerator, ref denominator);
-        return 12.5f * (numerator / denominator);
+        return denominator > 0f ? MaxBonus * (numerator / denominator) : 0f;
     }
 
-    private static void AddCategory(CompiledDiet diet, EnumFoodCategory cat, float level, float maxSaturation, ref float numerator, ref float denominator)
+    private static void AddCategory(CompiledDiet? diet, EnumFoodCategory cat, float level, float maxSaturation, ref float numerator, ref float denominator)
     {
-        if (!diet.Categories.TryGetValue(cat, out CompiledCategory category)) return;
+        if (!DietNutritionBasis.Supports(diet, cat)) return;
+        float weight = diet == null ? 1f : diet.Categories[cat].HealthWeight;
 
-        numerator += level / maxSaturation * category.HealthWeight;
-        denominator += category.HealthWeight;
+        numerator += DietNutritionBasis.Fraction(level, maxSaturation) * weight;
+        denominator += weight;
     }
 }

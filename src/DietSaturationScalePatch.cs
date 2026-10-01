@@ -16,6 +16,9 @@ public static class DietSaturationScalePatch
         __state = (null, null, 0, 0, 0);
         var snapshot = DietRuntimeSnapshot.For(__instance.entity.Api);
         if (!snapshot.Config.EnableDietSystem) return;
+        var diet = DietIdResolver.ResolveDiet(__instance.entity, snapshot);
+        // Before vanilla clamps this credit to a changed stomach and before the levels below are captured.
+        DietNutritionBasis.Reconcile(__instance, diet);
         if (__instance.entity is EntityAgent agent && DietConsumption.Current?.TryCredit(agent,
             out float nutritionMult) == true) nutritionGainMultiplier *= nutritionMult;
         var operation = ReferenceEquals(DietConsumption.Current?.Entity, __instance.entity) ? DietConsumption.Current : null;
@@ -27,7 +30,6 @@ public static class DietSaturationScalePatch
                 __instance.Saturation, DietDiagnostics.LossDelay(__instance, foodCat));
             if (__state.Row != null) __state.Row.SubmittedSatiety = saturation;
         }
-        var diet = DietIdResolver.ResolveDiet(__instance.entity, snapshot);
         if (diet != null && diet.Categories.TryGetValue(foodCat, out var category))
             nutritionGainMultiplier *= category.NutritionGainScale;
     }

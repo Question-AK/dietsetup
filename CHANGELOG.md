@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- The nutrition health bonus can no longer exceed 12.5. A bar above the stomach size counts as full, not more.
+- Changing race or stomach size keeps each nutrition bar's share of the stomach. A Half-Giant with full
+  bars who becomes a Human has full Human bars, not five times them. A bar the old diet did not weigh
+  starts empty, so switching cannot fill it. Saves from earlier builds have oversized bars cut to full.
+- `/dietdiag` shows observed MaxHealth as base, `maxhealthExtraPoints` and all modifiers, and the nutrition
+  bonus computed from the current bars. It no longer prints `(not set)` from a property 1.22 never writes.
+
 ## 1.0.2-dev.1 — development candidate
 
 - Add the approved Cannibalism meat, Primitive Survival fish-egg/caviar, and crabmeat mappings.

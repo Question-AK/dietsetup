@@ -476,15 +476,9 @@ public class DietSetupModSystem : ModSystem
 
         string hungerSummary = hunger == null
             ? "unavailable (no hunger behavior on this entity)"
-            : $"Sat={hunger.Saturation:F1}/{hunger.MaxSaturation:F1} FruitLvl={hunger.FruitLevel:F1} VegLvl={hunger.VegetableLevel:F1} ProteinLvl={hunger.ProteinLevel:F1} GrainLvl={hunger.GrainLevel:F1} DairyLvl={hunger.DairyLevel:F1}";
+            : $"Sat={hunger.Saturation:F1}/{hunger.MaxSaturation:F1} FruitLvl={hunger.FruitLevel:F1} VegLvl={hunger.VegetableLevel:F1} ProteinLvl={hunger.ProteinLevel:F1} GrainLvl={hunger.GrainLevel:F1} DairyLvl={hunger.DairyLevel:F1} {DietNutritionBasis.Describe(entity)}";
 
-#pragma warning disable CS0618 // MaxHealthModifiers is obsolete for writing; reading it here is fine
-        string healthSummary = health == null
-            ? "unavailable (no health behavior on this entity)"
-            : health.MaxHealthModifiers != null && health.MaxHealthModifiers.TryGetValue("nutrientHealthMod", out float nutrientBonus)
-                ? $"nutrientHealthMod={nutrientBonus:F2}/12.50 MaxHealth={health.MaxHealth:F1}"
-                : $"nutrientHealthMod=(not set) MaxHealth={health.MaxHealth:F1}";
-#pragma warning restore CS0618
+        string healthSummary = DescribeHealth(entity, health, hunger, Config.EnableDietSystem);
 
         ItemSlot? heldSlot = entity.RightHandItemSlot;
         string heldSummary;
@@ -530,6 +524,21 @@ public class DietSetupModSystem : ModSystem
             patchSummary);
 
         return TextCommandResult.Success(msg);
+    }
+
+    // 1.22 sums max-health modifiers from a protected field and never writes the obsolete public
+    // MaxHealthModifiers, so the nutrition share is computed beside the observed totals, not read back.
+    internal static string DescribeHealth(Entity entity, EntityBehaviorHealth? health, EntityBehaviorHunger? hunger, bool dietSystem)
+    {
+        if (health == null) return "health: unavailable (no health behavior on this entity)";
+        float statExtra = entity.Stats.GetBlended("maxhealthExtraPoints") - 1f;
+        float modifiers = health.MaxHealth - health.BaseMaxHealth - statExtra;
+        string observed = $"health (observed): MaxHealth={health.MaxHealth:F2} = base {health.BaseMaxHealth:F2} " +
+            $"{statExtra:+0.00;-0.00} maxhealthExtraPoints {modifiers:+0.00;-0.00} modifiers (all mods, nutrition included)";
+        string expected = hunger == null ? "unavailable (no hunger behavior on this entity)"
+            : !dietSystem ? "not computed (diet system off; vanilla sets it)"
+            : $"{DietNutrientHealthBoostPatch.ComputeBonus(DietIdResolver.ResolveDiet(entity), hunger):F2} of {DietNutrientHealthBoostPatch.MaxBonus:F2}";
+        return $"{observed}\nnutrition bonus (computed from current levels): {expected}";
     }
 
     private TextCommandResult DiagItem(ICoreServerAPI api, IServerPlayer caller, string itemCode)
