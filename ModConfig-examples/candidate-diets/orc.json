@@ -17,7 +17,7 @@
     { "requires": ["meat", "cooked"], "priority": 30, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.25 },
     { "requires": ["meat", "raw"], "priority": 30, "satietyMult": 1.0, "nutritionMult": 0.8 },
     { "requires": ["organ"], "excludes": ["meat"], "priority": 30, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.2 },
-    { "requires": ["fish"], "priority": 20, "satietyMult": 1.0, "nutritionMult": 0.7 },
+    { "requires": ["fish"], "excludes": ["shellfish", "egg"], "priority": 20, "satietyMult": 1.0, "nutritionMult": 0.7 },
     { "requires": ["insect"], "priority": 20, "satietyMult": 1.0, "nutritionMult": 0.7 },
     { "requires": ["seed"], "priority": 20, "satietyMult": 0.25, "nutritionMult": 0.2 },
     { "requires": ["nut"], "priority": 20, "satietyMult": 0.25, "nutritionMult": 0.2 },

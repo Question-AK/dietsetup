@@ -19,7 +19,7 @@
     { "requires": ["root", "preserved"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.75 },
     { "requires": ["fruit", "preserved"], "priority": 35, "satietyMult": 1.0, "nutritionMult": 1.25 },
     { "requires": ["meat", "preserved"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.5 },
-    { "requires": ["fish", "preserved"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.5 },
+    { "requires": ["fish", "preserved"], "excludes": ["shellfish", "egg"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.5 },
     { "requires": ["meat", "raw"], "priority": 35, "satietyMult": 0.5, "nutritionMult": 0.15 },
     { "requires": ["grain", "cooked"], "priority": 35, "satietyMult": 1.0, "nutritionMult": 1.33 },
     { "requires": ["fungus"], "priority": 30, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 2.5 },

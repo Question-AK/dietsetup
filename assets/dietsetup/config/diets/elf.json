@@ -18,6 +18,7 @@
     },
     {
       "requires": ["organ"],
+      "excludes": ["meat"],
       "priority": 40,
       "verdict": "inedible"
     },
@@ -37,6 +38,7 @@
     },
     {
       "requires": ["fish"],
+      "excludes": ["shellfish", "egg"],
       "priority": 30,
       "satietyMult": 1.0,
       "nutritionMult": 1.0

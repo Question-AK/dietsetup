@@ -26,6 +26,7 @@
     },
     {
       "requires": ["organ"],
+      "excludes": ["meat"],
       "priority": 30,
       "verdict": "nourishing",
       "satietyMult": 1.0,
@@ -33,6 +34,7 @@
     },
     {
       "requires": ["fish"],
+      "excludes": ["shellfish", "egg"],
       "priority": 20,
       "satietyMult": 1.0,
       "nutritionMult": 0.7

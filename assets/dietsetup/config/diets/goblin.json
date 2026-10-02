@@ -62,6 +62,7 @@
     },
     {
       "requires": ["organ"],
+      "excludes": ["meat"],
       "priority": 20,
       "satietyMult": 1.0,
       "nutritionMult": 1.2
