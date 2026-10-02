@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "grants": [
-    { "pattern": "game:redmeat-raw", "category": "Protein", "baseSatiety": 100, "access": { "mode": "listed", "diets": ["orc"] } },
-    { "pattern": "game:poultry-raw", "category": "Protein", "baseSatiety": 80, "access": { "mode": "listed", "diets": ["orc"] } },
-    { "pattern": "game:bushmeat-raw", "category": "Protein", "baseSatiety": 50, "access": { "mode": "listed", "diets": ["orc"] } }
+    { "pattern": "game:redmeat-raw", "category": "Protein", "baseSatiety": 100, "access": { "mode": "listed", "diets": ["orc", "goblin"] } },
+    { "pattern": "game:poultry-raw", "category": "Protein", "baseSatiety": 80, "access": { "mode": "listed", "diets": ["orc", "goblin"] } },
+    { "pattern": "game:bushmeat-raw", "category": "Protein", "baseSatiety": 50, "access": { "mode": "listed", "diets": ["orc", "goblin"] } }
   ]
 }

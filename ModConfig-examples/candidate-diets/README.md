@@ -8,7 +8,7 @@ Test rig's active configuration. Every file is a whole-file override that extend
 
 1. Copy `<race>.json` to the server's `ModConfig/dietsetup/diets/<race>.json`. For Human, Orc and Half-Giant this
    replaces the nutrition pilot. Bindings stay as they are: each `rf-<race>-positive` trait already maps to `<race>`.
-2. Orc only: to let Orcs eat raw meat, also copy `food-overrides.json` to `ModConfig/dietsetup/food-overrides.json`
+2. Orc and Goblin: to let them eat raw meat, also copy `food-overrides.json` to `ModConfig/dietsetup/food-overrides.json`
    (merge its three grants by hand if that file already exists). Grant changes need a world restart.
 3. Run `/dietreload` (or restart), then `/dietshow <race>` should report `nutritionModel=DemandNormalised` and
    `overflowNutrition=Proportional`.
@@ -25,7 +25,7 @@ first-pass numbers for play testing.
 | Human | Generalist: every capacity 1, no rules, vanilla spoilage. | — |
 | Elf | Meat and organ inedible, as shipped. Fish allowed without the fresh bonus, keeping fish, insect and meat distinct. Spoilage is gradual: each spoiled curve starts at the fresh value, so the first spoil tick is no cliff. Preserved food harmful, as shipped. | Capacities F 1.4, V 1.24, G 0.6, P 0.8, D 0 (shipped). Curve anchors (satiety 1.25 → 0.9 → 0.55 → 0.1 at 0/25/50/100% spoil; fish 1.0 → 0.08). Seed and nut nutrition 1.75. Juice 1.25/1.5. Whether the generic spoiled rule should also carry the `harmful` label. |
 | Dwarf | Source × preparation interact: preserved roots, greens, fruit, meat and fish rank above their fresh or cooked forms; raw meat stays poor; fungus and roots are favoured. | Capacities F 0.6, V 0.8, G 1.08, P 1.32, D 1.32. Fungus nutrition 2.5. Preserved root 1.75. Fresh leaf and fruit 0.75/0.75. Raw meat 0.5/0.15. Cooked grain 1.33. Alcohol 1.5/1.5. |
-| Goblin | Rot unchanged (1.75/1.5, priority 40). Meat, fish and organ curves replace vanilla spoil loss, so moderately spoiled meat keeps full satiety and gains nutrition. Fresh fruit, leaves and roots harmful, as shipped. Insects nourishing. | Fresh meat nutrition 0.6, rising to 1.3 at 40–70% spoil. Organ curve 1.0 → 1.4. Juice curve 0.2 → 1.1 at 85% spoil. Spoiled satiety 1.0 → 0.5. Fresh satiety 0.7. Insects 1.2/1.5. Grain capacity 0.4. |
+| Goblin | Rot unchanged (1.75/1.5, priority 40). Meat, fish and organ curves replace vanilla spoil loss, so moderately spoiled meat keeps full satiety and gains nutrition. Fresh fruit, leaves and roots harmful, as shipped. Insects nourishing. Raw meat edible (the Orc raw-meat grants also list `goblin`), so fresh raw meat is less nutritious than spoiling raw meat. | Fresh meat nutrition 0.6, rising to 1.3 at 40–70% spoil. Organ curve 1.0 → 1.4. Juice curve 0.2 → 1.1 at 85% spoil. Spoiled satiety 1.0 → 0.5. Fresh satiety 0.7. Insects 1.2/1.5. Grain capacity 0.4. |
 | Orc | Raw meat usable at full satiety; cooked meat more nutritious; no fruit or vegetable bar, as shipped; large stomach (3750) gives endurance; dairy carries a reduced health share. | Capacities G 0.6, P 1.6, D 0.5. Raw meat nutrition 0.8, cooked 1.25. Organ 1.2. Fish and insects 0.7. Seeds and nuts 0.25/0.2. Raw-meat grant satieties 100/80/50 (red meat, poultry, bushmeat). |
 | Half-Giant | Demand (5.31×) is absorbed by demand normalisation, so bar gain per meal is on the Human scale relative to its own hunger. Agricultural and herding preferences. | Capacities F 0.8, V 0.8, G 1.0, P 1.2, D 1.2. Dairy and grain nutrition 1.25. Root 1.1. Cooked meat 1.0, labelled nourishing. |
 
