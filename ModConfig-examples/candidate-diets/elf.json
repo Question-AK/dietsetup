@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "elf",
+  "extends": "base",
+  "nutritionModel": "demandNormalised",
+  "nutritionRequirement": 1.0,
+  "overflowNutrition": "proportional",
+  "categories": {
+    "Fruit": { "capacity": 1.4 },
+    "Vegetable": { "capacity": 1.24 },
+    "Grain": { "capacity": 0.6 },
+    "Protein": { "capacity": 0.8 },
+    "Dairy": { "capacity": 0.0 }
+  },
+  "fallback": { "satietyMult": 1.0, "nutritionMult": 1.0 },
+  "rules": [
+    { "requires": ["meat"], "priority": 40, "verdict": "inedible" },
+    { "requires": ["organ"], "priority": 40, "verdict": "inedible" },
+    // Fish stays permitted without the fresh bonus; once it turns it follows the same gradual decline.
+    { "requires": ["fish", "spoiled"], "priority": 35,
+      "satietyCurve": [ { "spoil": 0.0, "value": 1.0 }, { "spoil": 0.25, "value": 0.72 }, { "spoil": 0.5, "value": 0.44 }, { "spoil": 1.0, "value": 0.08 } ],
+      "nutritionCurve": [ { "spoil": 0.0, "value": 1.0 }, { "spoil": 0.15, "value": 0.8 }, { "spoil": 0.35, "value": 0.48 }, { "spoil": 0.6, "value": 0.24 }, { "spoil": 1.0, "value": 0.12 } ] },
+    { "requires": ["seed"], "priority": 30, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.75 },
+    { "requires": ["nut"], "priority": 30, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.75 },
+    { "requires": ["fish"], "priority": 30, "satietyMult": 1.0, "nutritionMult": 1.0 },
+    { "requires": ["preserved"], "priority": 25, "verdict": "harmful", "satietyMult": 0.75, "nutritionMult": 0.6 },
+    // Continuous with the fresh rule at spoil 0, so the first spoil tick is no longer a cliff.
+    { "requires": ["spoiled"], "priority": 25,
+      "satietyCurve": [ { "spoil": 0.0, "value": 1.25 }, { "spoil": 0.25, "value": 0.9 }, { "spoil": 0.5, "value": 0.55 }, { "spoil": 1.0, "value": 0.1 } ],
+      "nutritionCurve": [ { "spoil": 0.0, "value": 1.25 }, { "spoil": 0.15, "value": 1.0 }, { "spoil": 0.35, "value": 0.6 }, { "spoil": 0.6, "value": 0.3 }, { "spoil": 1.0, "value": 0.15 } ] },
+    { "requires": ["juice", "liquid"], "priority": 15, "verdict": "nourishing", "satietyMult": 1.25, "nutritionMult": 1.5 },
+    { "requires": ["fresh"], "priority": 10, "verdict": "nourishing", "satietyMult": 1.25, "nutritionMult": 1.25 }
+  ]
+}

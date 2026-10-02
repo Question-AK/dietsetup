@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "goblin",
+  "extends": "base",
+  "nutritionModel": "demandNormalised",
+  "nutritionRequirement": 1.0,
+  "overflowNutrition": "proportional",
+  "categories": {
+    "Fruit": { "capacity": 1.0 },
+    "Vegetable": { "capacity": 1.0 },
+    "Grain": { "capacity": 0.4 },
+    "Protein": { "capacity": 1.32 },
+    "Dairy": { "capacity": 1.08 }
+  },
+  "fallback": { "satietyMult": 1.0, "nutritionMult": 1.0 },
+  "rules": [
+    { "requires": ["rotten"], "priority": 40, "verdict": "nourishing", "satietyMult": 1.75, "nutritionMult": 1.5 },
+    { "requires": ["insect"], "priority": 36, "verdict": "nourishing", "satietyMult": 1.2, "nutritionMult": 1.5 },
+    // Curves replace vanilla's spoilage loss, so satiety stays whole and the curve is the whole response to spoil.
+    { "requires": ["organ"], "excludes": ["meat"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0,
+      "nutritionCurve": [ { "spoil": 0.0, "value": 1.0 }, { "spoil": 0.3, "value": 1.3 }, { "spoil": 0.6, "value": 1.4 }, { "spoil": 0.9, "value": 1.2 }, { "spoil": 1.0, "value": 1.2 } ] },
+    { "requires": ["meat"], "priority": 35, "satietyMult": 1.0,
+      "nutritionCurve": [ { "spoil": 0.0, "value": 0.6 }, { "spoil": 0.15, "value": 1.0 }, { "spoil": 0.4, "value": 1.3 }, { "spoil": 0.7, "value": 1.3 }, { "spoil": 0.9, "value": 1.1 }, { "spoil": 1.0, "value": 1.1 } ] },
+    { "requires": ["fish"], "priority": 35, "satietyMult": 1.0,
+      "nutritionCurve": [ { "spoil": 0.0, "value": 0.6 }, { "spoil": 0.15, "value": 1.0 }, { "spoil": 0.4, "value": 1.3 }, { "spoil": 0.7, "value": 1.3 }, { "spoil": 0.9, "value": 1.1 }, { "spoil": 1.0, "value": 1.1 } ] },
+    { "requires": ["juice", "liquid"], "priority": 35, "satietyMult": 1.0,
+      "nutritionCurve": [ { "spoil": 0.0, "value": 0.20 }, { "spoil": 0.3, "value": 0.35 }, { "spoil": 0.85, "value": 1.10 }, { "spoil": 1.0, "value": 1.10 } ] },
+    // Above the spoilage tolerance below, so spoiled plants stay poor rather than turning useful.
+    { "requires": ["fruit"], "priority": 32, "verdict": "harmful", "satietyMult": 0.25, "nutritionMult": 0.4 },
+    { "requires": ["leaf"], "priority": 32, "verdict": "harmful", "satietyMult": 0.25, "nutritionMult": 0.4 },
+    { "requires": ["root"], "priority": 32, "verdict": "harmful", "satietyMult": 0.25, "nutritionMult": 0.4 },
+    { "requires": ["fungus"], "priority": 32, "satietyMult": 1.0, "nutritionMult": 1.0 },
+    { "requires": ["spoiled"], "priority": 30,
+      "satietyCurve": [ { "spoil": 0.0, "value": 1.0 }, { "spoil": 0.5, "value": 0.75 }, { "spoil": 1.0, "value": 0.5 } ], "nutritionMult": 1.0 },
+    { "requires": ["fresh"], "priority": 4, "satietyMult": 0.7 }
+  ]
+}

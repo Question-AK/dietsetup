@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "dwarf",
+  "extends": "base",
+  "nutritionModel": "demandNormalised",
+  "nutritionRequirement": 1.0,
+  "overflowNutrition": "proportional",
+  "categories": {
+    "Fruit": { "capacity": 0.6 },
+    "Vegetable": { "capacity": 0.8 },
+    "Grain": { "capacity": 1.08 },
+    "Protein": { "capacity": 1.32 },
+    "Dairy": { "capacity": 1.32 }
+  },
+  "fallback": { "satietyMult": 1.0, "nutritionMult": 1.0 },
+  "rules": [
+    // Source x preparation pairs are explicit and outrank both single-tag layers, so no pairing wins by accident.
+    { "requires": ["leaf", "preserved"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.5 },
+    { "requires": ["root", "preserved"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.75 },
+    { "requires": ["fruit", "preserved"], "priority": 35, "satietyMult": 1.0, "nutritionMult": 1.25 },
+    { "requires": ["meat", "preserved"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.5 },
+    { "requires": ["fish", "preserved"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.5 },
+    { "requires": ["meat", "raw"], "priority": 35, "satietyMult": 0.5, "nutritionMult": 0.15 },
+    { "requires": ["grain", "cooked"], "priority": 35, "satietyMult": 1.0, "nutritionMult": 1.33 },
+    { "requires": ["fungus"], "priority": 30, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 2.5 },
+    { "requires": ["root"], "priority": 30, "satietyMult": 1.0, "nutritionMult": 1.5 },
+    { "requires": ["leaf"], "priority": 30, "satietyMult": 0.75, "nutritionMult": 0.75 },
+    { "requires": ["fruit"], "priority": 30, "satietyMult": 0.75, "nutritionMult": 0.75 },
+    { "requires": ["alcohol"], "priority": 25, "verdict": "nourishing", "satietyMult": 1.5, "nutritionMult": 1.5 },
+    { "requires": ["preserved"], "priority": 25, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.25 },
+    { "requires": ["juice", "liquid"], "priority": 25, "satietyMult": 1.0, "nutritionMult": 1.0 }
+  ]
+}
