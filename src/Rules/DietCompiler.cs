@@ -29,6 +29,7 @@ public static class DietCompiler
         }
 
         TryParseNutritionModel(doc.NutritionModel, out NutritionModel model);
+        TryParseOverflowNutrition(doc.OverflowNutrition, out OverflowNutrition overflow);
         // Checked on the merged document: a requirement a legacy diet inherits or sets would be silently ignored.
         if (model == NutritionModel.Legacy && (doc.NutritionRequirement.HasValue || doc.Categories.Values.Any(c => c.NutritionRequirement.HasValue)))
             fatal.Add(new DietValidationMessage(0, "nutritionRequirement applies only to nutritionModel 'demandNormalised'"));
@@ -62,6 +63,7 @@ public static class DietCompiler
             Id = id,
             SourceDomain = domain,
             NutritionModel = model,
+            OverflowNutrition = overflow,
             Categories = categories.ToImmutableDictionary(),
             FallbackSatietyMult = fallbackSatiety,
             FallbackNutritionMult = fallbackNutrition,
@@ -119,6 +121,15 @@ public static class DietCompiler
         if (value == null || value.Equals("legacy", StringComparison.OrdinalIgnoreCase)) return true;
         if (!value.Equals("demandNormalised", StringComparison.OrdinalIgnoreCase)) return false;
         model = NutritionModel.DemandNormalised;
+        return true;
+    }
+
+    public static bool TryParseOverflowNutrition(string? value, out OverflowNutrition overflow)
+    {
+        overflow = OverflowNutrition.WholeItem;
+        if (value == null || value.Equals("wholeItem", StringComparison.OrdinalIgnoreCase)) return true;
+        if (!value.Equals("proportional", StringComparison.OrdinalIgnoreCase)) return false;
+        overflow = OverflowNutrition.Proportional;
         return true;
     }
 
@@ -387,6 +398,8 @@ public static class DietCompiler
         if (doc == null) return errors;
         if (!TryParseNutritionModel(doc.NutritionModel, out _))
             errors.Add($"nutritionModel: unknown model '{doc.NutritionModel}' (expected 'legacy' or 'demandNormalised')");
+        if (!TryParseOverflowNutrition(doc.OverflowNutrition, out _))
+            errors.Add($"overflowNutrition: unknown policy '{doc.OverflowNutrition}' (expected 'wholeItem' or 'proportional')");
         Requirement(doc.NutritionRequirement, "nutritionRequirement");
         if (doc.Categories == null) errors.Add("categories: null object");
         else foreach (var (name, category) in doc.Categories)

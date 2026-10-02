@@ -39,6 +39,8 @@ internal sealed class DietConsumption : IDisposable
     private readonly DietConsumption bite;
     private bool? startedFull;
     internal bool? StartedFull { get => bite.startedFull; set => bite.startedFull = value; }
+    private ProportionalCredit? overflow;
+    private readonly List<(EnumFoodCategory Category, float Satiety, float Gain)> overflowShare = new();
 
     private DietConsumption(EntityAgent entity)
     {
@@ -81,13 +83,29 @@ internal sealed class DietConsumption : IDisposable
 
     internal void RecordHealth(float delta) => submittedHealth += delta;
 
+    /// <summary>Opened at the mouthful's first credit, after excess satiety is trimmed, so the space is the stomach
+    /// the whole mouthful competes for.</summary>
+    internal void OpenProportionalCredit(float space) => bite.overflow ??= new ProportionalCredit(Math.Max(0f, space));
+
+    internal void NoteLevelBeforeCredit(EnumFoodCategory category, float level) => bite.overflow?.NoteBefore(category, level);
+
+    /// <summary>The credit's final satiety and uncapped bar gain, as vanilla applied them after every prefix.</summary>
+    internal void RecordProportionalCredit(EnumFoodCategory category, float satiety, float gain)
+    {
+        if (bite.overflow == null) return;
+        bite.overflow.Add(category, satiety, gain);
+        overflowShare.Add((category, satiety, gain));
+    }
+
     internal void Confirm(DietConsumptionOutcome outcome)
     {
         this.outcome = outcome;
         bool consumed = outcome == DietConsumptionOutcome.Consumed;
+        // Only the scope that owns the mouthful settles it, after every nested site has credited.
+        string settlement = outcome != DietConsumptionOutcome.Refused && ReferenceEquals(bite, this) ? SettleProportionalCredit() : "";
         if (Snapshot.Config.RecordLastConsumption)
             Entity.Api.ModLoader.GetModSystem<DietSetupModSystem>().RecordConsumption(Entity.EntityId,
-                $"consumed={consumed}\n" + string.Join("\n", Traces.ConvertAll(row => row.Format())));
+                $"consumed={consumed}{settlement}\n" + string.Join("\n", Traces.ConvertAll(row => row.Format())));
         if (!consumed) return;
         // One physical mouthful fires a winning rule's effects once however many portions it was split into.
         var fired = new HashSet<(object, string)>();
@@ -109,8 +127,37 @@ internal sealed class DietConsumption : IDisposable
         if (ReferenceEquals(current, this)) current = previous;
     }
 
+    /// <summary>Scales every bar this mouthful fed by the share of its effective satiety that fitted. Applied to the
+    /// uncapped gains, so neither the order of the credits nor a bar reaching its cap part-way changes the result.</summary>
+    private string SettleProportionalCredit()
+    {
+        if (overflow is not { } credit) return "";
+        // A mouthful that fits, or one with no satiety, keeps fraction 1 and divides nothing.
+        if (!(credit.Satiety > credit.Space)) return $" overflow=proportional space={credit.Space:F2} satiety={credit.Satiety:F2} fraction=1";
+        float fraction = credit.Space / credit.Satiety;
+        if (Entity.GetBehavior<EntityBehaviorHunger>() is not { } hunger) return "";
+        float max = hunger.MaxSaturation;
+        bool changed = false;
+        foreach (var (category, before, gain) in credit.Bars())
+        {
+            float level = DietDiagnostics.Level(hunger, category);
+            float target = Math.Max(0f, Math.Min(max, before + gain * fraction));
+            if (!(target < level)) continue;
+            float kept = level > before ? (target - before) / (level - before) : 0f;
+            foreach (var row in Traces)
+                if (row.Category == category && row.ActualNutrition is float actual) row.ActualNutrition = actual * kept;
+            SetLevel(hunger, category, target);
+            changed = true;
+        }
+        if (changed) hunger.UpdateNutrientHealthBoost();
+        return $" overflow=proportional space={credit.Space:F2} satiety={credit.Satiety:F2} fraction={fraction:F4}";
+    }
+
     private void Withdraw()
     {
+        // A refused nested site's credits were never part of the mouthful its owner settles.
+        foreach (var (category, satiety, gain) in overflowShare) bite.overflow?.Add(category, -satiety, -gain);
+        overflowShare.Clear();
         if (submittedHealth != 0f && Entity.GetBehavior<EntityBehaviorHealth>() is { } health)
             health.Health -= submittedHealth;
         submittedHealth = 0f;
@@ -154,4 +201,29 @@ internal sealed class DietConsumption : IDisposable
     }
 
     private readonly record struct Provisional(EnumFoodCategory Category, float Level, float Saturation, float LossDelay);
+
+    private sealed class ProportionalCredit
+    {
+        internal readonly float Space;
+        internal float Satiety;
+        private readonly Dictionary<EnumFoodCategory, (float Before, float Gain)> bars = new();
+
+        internal ProportionalCredit(float space) => Space = space;
+
+        internal void NoteBefore(EnumFoodCategory category, float level)
+        {
+            if (!bars.ContainsKey(category)) bars[category] = (level, 0f);
+        }
+
+        internal void Add(EnumFoodCategory category, float satiety, float gain)
+        {
+            Satiety += satiety;
+            if (bars.TryGetValue(category, out var bar)) bars[category] = (bar.Before, bar.Gain + gain);
+        }
+
+        internal IEnumerable<(EnumFoodCategory Category, float Before, float Gain)> Bars()
+        {
+            foreach (var (category, bar) in bars) yield return (category, bar.Before, bar.Gain);
+        }
+    }
 }

@@ -1,4 +1,5 @@
 using dietsetup.Binding;
+using dietsetup.Rules;
 using HarmonyLib;
 using Vintagestory.API.Common;
 using Vintagestory.GameContent;
@@ -26,6 +27,11 @@ public static class DietSaturationScalePatch
         {
             // At the first credit, not per credit: one that fills the stomach must not cost the rest of the mouthful.
             operation.StartedFull ??= __instance.Saturation >= __instance.MaxSaturation;
+            if (diet?.OverflowNutrition == OverflowNutrition.Proportional)
+            {
+                operation.OpenProportionalCredit(__instance.MaxSaturation - __instance.Saturation);
+                operation.NoteLevelBeforeCredit(foodCat, DietDiagnostics.Level(__instance, foodCat));
+            }
             if (operation.TryCredit(operation.Entity, out float nutritionMult)) nutritionGainMultiplier *= nutritionMult;
             // Captured for every credit the open transaction sees, not only traced ones, so a refused
             // mouthful can be withdrawn even where no row was queued for it.
@@ -37,13 +43,16 @@ public static class DietSaturationScalePatch
     }
 
     [HarmonyPostfix]
-    internal static void Postfix(EntityBehaviorHunger __instance, EnumFoodCategory foodCat, bool __runOriginal,
-        (DietConsumption? Operation, DietIngredientTrace? Row, float Before, float BeforeSatiety, float BeforeDelay) __state)
+    internal static void Postfix(EntityBehaviorHunger __instance, EnumFoodCategory foodCat, bool __runOriginal, float saturation,
+        float nutritionGainMultiplier, (DietConsumption? Operation, DietIngredientTrace? Row, float Before, float BeforeSatiety, float BeforeDelay) __state)
     {
         if (__state.Operation == null) return;
         float nutrition = __runOriginal ? DietDiagnostics.Level(__instance, foodCat) - __state.Before : 0f;
         float credited = __runOriginal ? __instance.Saturation - __state.BeforeSatiety : 0f;
         if (__runOriginal) __state.Operation.RecordSubmission(foodCat, nutrition, credited, __state.BeforeDelay);
+        // Read here rather than in the prefix: every prefix, PlayerModelLib's satiety stats included, has scaled both by now.
+        if (__runOriginal) __state.Operation.RecordProportionalCredit(foodCat, saturation,
+            __state.Operation.StartedFull == true ? 0f : saturation / 2.5f * nutritionGainMultiplier);
         if (__state.Row == null) return;
         __state.Row.ActualNutrition = nutrition;
         __state.Row.CreditedSatiety = credited;

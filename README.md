@@ -59,6 +59,8 @@ Meals additionally retain vanilla ingredient/recipe quantity and pie baking fact
 
 A diet can opt into `"nutritionModel": "demandNormalised"`. Its bars then gain as if the race had a Human stomach and appetite, divided by an optional `nutritionRequirement` (default 1.0, with per-category overrides), and decay on the Human curve. The racial demand factor is PlayerModelLib's `saturationLossFactor`; cold and other hunger effects still speed decay. Capacity still decides which bars are supported and their health share. Diets without the field keep the formula above. Inactive Human, Orc and Half-Giant pilots are in `ModConfig-examples/nutrition-pilot/`.
 
+A diet can also opt into `"overflowNutrition": "proportional"` (default `"wholeItem"`). A mouthful then credits `clamp(space / satiety, 0, 1)` of its nutrition, where space is the stomach room at its first credit and satiety is the total the mouthful offered after diet and spoilage multipliers. One fraction covers every credit of the mouthful. Bowl and pie servings are already cut to the space, so they keep fraction 1. Only nutrition bars change; `/dietfood last` reports the fraction.
+
 ## Commands and reporting
 
 - `/dietdiag`: assigned diet, snapshot, current bars, observed MaxHealth with its parts, and the nutrition bonus computed from the current bars.

@@ -11,6 +11,7 @@ public class DietDocumentFile : DietAuthoringFile
     public string? Extends { get; set; }
     public string? NutritionModel { get; set; }
     public float? NutritionRequirement { get; set; }
+    public string? OverflowNutrition { get; set; }
     public Dictionary<string, DietCategoryFile> Categories { get; set; } = new();
     public DietFallbackFile? Fallback { get; set; }
     public DietRuleFileEntry[] Rules { get; set; } = Array.Empty<DietRuleFileEntry>();

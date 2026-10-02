@@ -10,6 +10,7 @@ public sealed class CompiledDiet
     public string Id { get; init; } = "";
     public string SourceDomain { get; init; } = "";
     public NutritionModel NutritionModel { get; init; } = NutritionModel.Legacy;
+    public OverflowNutrition OverflowNutrition { get; init; } = OverflowNutrition.WholeItem;
 
     public ImmutableDictionary<EnumFoodCategory, CompiledCategory> Categories { get; init; } = ImmutableDictionary<EnumFoodCategory, CompiledCategory>.Empty;
 
@@ -23,6 +24,14 @@ public enum NutritionModel
     Legacy,
     /// <summary>Gain normalised to racial demand and divided by the requirement; decay on the Human curve.</summary>
     DemandNormalised,
+}
+
+public enum OverflowNutrition
+{
+    /// <summary>A mouthful that starts below full credits its whole nutrition, as in vanilla.</summary>
+    WholeItem,
+    /// <summary>A mouthful credits the share of its effective satiety that fitted the stomach.</summary>
+    Proportional,
 }
 
 public readonly struct CompiledCategory

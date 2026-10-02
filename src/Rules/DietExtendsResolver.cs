@@ -64,6 +64,7 @@ public static class DietExtendsResolver
             Extends = child.Extends,
             NutritionModel = child.NutritionModel ?? parent.NutritionModel,
             NutritionRequirement = child.NutritionRequirement ?? parent.NutritionRequirement,
+            OverflowNutrition = child.OverflowNutrition ?? parent.OverflowNutrition,
             Categories = categories,
             Fallback = child.Fallback ?? parent.Fallback,
             Rules = rules.ToArray(),

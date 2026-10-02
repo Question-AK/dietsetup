@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Diets can opt into `"overflowNutrition": "proportional"`. A mouthful then gives only the share of its nutrition
+  whose satiety fitted in the stomach: with 25 space, a 100-satiety meat gives a quarter of its nutrition. One
+  fraction covers every part of the mouthful (meal ingredients, ACA rows, base item), whatever their order. A
+  bowl or pie serving already cut to the space keeps all of its nutrition. Items eaten, satiety, healing,
+  intoxication and refusals are unchanged. Diets without the field keep whole-item credit.
+
 ## 1.0.3-nutrition.1 — local Diet Test candidate (not released)
 
 - Diets can opt into `"nutritionModel": "demandNormalised"`: gain is measured against the race's own food

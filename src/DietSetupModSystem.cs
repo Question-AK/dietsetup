@@ -398,7 +398,7 @@ public class DietSetupModSystem : ModSystem
     private string FormatDietShow(CompiledDiet diet)
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"diet '{diet.Id}' (domain '{diet.SourceDomain}') nutritionModel={diet.NutritionModel}");
+        sb.AppendLine($"diet '{diet.Id}' (domain '{diet.SourceDomain}') nutritionModel={diet.NutritionModel} overflowNutrition={diet.OverflowNutrition}");
 
         foreach (EnumFoodCategory cat in new[] { EnumFoodCategory.Fruit, EnumFoodCategory.Vegetable, EnumFoodCategory.Grain, EnumFoodCategory.Protein, EnumFoodCategory.Dairy })
         {

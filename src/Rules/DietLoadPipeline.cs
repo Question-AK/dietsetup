@@ -285,7 +285,8 @@ public static class DietLoadPipeline
         return $"[dietsetup]   {diet.Id.PadRight(idColumnWidth)}cap F{Cap(EnumFoodCategory.Fruit)} V{Cap(EnumFoodCategory.Vegetable)} G{Cap(EnumFoodCategory.Grain)} P{Cap(EnumFoodCategory.Protein)} D{Cap(EnumFoodCategory.Dairy)}"
              + $"  gain F{Gain(EnumFoodCategory.Fruit)} V{Gain(EnumFoodCategory.Vegetable)} G{Gain(EnumFoodCategory.Grain)} P{Gain(EnumFoodCategory.Protein)} D{Gain(EnumFoodCategory.Dairy)}"
              + $"  rules {diet.Rules.Length}"
-             + (diet.NutritionModel == NutritionModel.DemandNormalised ? "  demandNormalised (gain x maxSat/(1500 x demand))" : "");
+             + (diet.NutritionModel == NutritionModel.DemandNormalised ? "  demandNormalised (gain x maxSat/(1500 x demand))" : "")
+             + (diet.OverflowNutrition == OverflowNutrition.Proportional ? "  proportional overflow" : "");
     }
     private static BindingsFile LoadAndLogBindings(ICoreAPI api, List<string> log, Dictionary<string, CompiledDiet> compiledTable, ref int warningCount)
     {
