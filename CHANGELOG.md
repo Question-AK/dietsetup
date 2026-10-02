@@ -1,7 +1,10 @@
 # Changelog
 
-## Unreleased
+## 1.0.3-nutrition.1 — local Diet Test candidate (not released)
 
+- Diets can opt into `"nutritionModel": "demandNormalised"`: gain is measured against the race's own food
+  demand and an optional `nutritionRequirement`, and bars decay on the Human curve. Diets without the field
+  behave as before. Inactive Human, Orc and Half-Giant pilot diets are in `ModConfig-examples/nutrition-pilot/`.
 - The nutrition health bonus can no longer exceed 12.5. A bar above the stomach size counts as full, not more.
 - Changing race or stomach size keeps each nutrition bar's share of the stomach. A Half-Giant with full
   bars who becomes a Human has full Human bars, not five times them. A bar the old diet did not weigh

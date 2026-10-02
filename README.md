@@ -57,6 +57,8 @@ base satiety ? effective satiety response ? consumed amount ? nutrition response
 
 Meals additionally retain vanilla ingredient/recipe quantity and pie baking factors. Capacity zero gives no nutrition and excludes that category from the weighted health average. Capacity determines reciprocal gain and health weight together; rule multipliers still change the effort needed to fill a bar. Full nonzero-category bars give the normal maximum nutrition health bonus of 12.5; no level counts past a full bar. When a race or stomach change alters the maximum saturation, each bar keeps its share of the stomach if both the old and the new diet weigh it, and otherwise starts empty. Fullness is decided once per mouthful, before its first credit: a mouthful that starts full gives no nutrition, and one that starts just below full gives the whole item's nutrition, as in vanilla. Satiety above a smaller stomach is removed on the next hunger tick, attack or meal, not when a world loads; a larger stomach adds no satiety.
 
+A diet can opt into `"nutritionModel": "demandNormalised"`. Its bars then gain as if the race had a Human stomach and appetite, divided by an optional `nutritionRequirement` (default 1.0, with per-category overrides), and decay on the Human curve. The racial demand factor is PlayerModelLib's `saturationLossFactor`; cold and other hunger effects still speed decay. Capacity still decides which bars are supported and their health share. Diets without the field keep the formula above. Inactive Human, Orc and Half-Giant pilots are in `ModConfig-examples/nutrition-pilot/`.
+
 ## Commands and reporting
 
 - `/dietdiag`: assigned diet, snapshot, current bars, observed MaxHealth with its parts, and the nutrition bonus computed from the current bars.
