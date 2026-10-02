@@ -1,12 +1,26 @@
 # Changelog
 
-## Unreleased
+## 1.0.3-nutrition.2 — local Diet Test candidate (not released)
 
 - Diets can opt into `"overflowNutrition": "proportional"`. A mouthful then gives only the share of its nutrition
   whose satiety fitted in the stomach: with 25 space, a 100-satiety meat gives a quarter of its nutrition. One
   fraction covers every part of the mouthful (meal ingredients, ACA rows, base item), whatever their order. A
   bowl or pie serving already cut to the space keeps all of its nutrition. Items eaten, satiety, healing,
-  intoxication and refusals are unchanged. Diets without the field keep whole-item credit.
+  intoxication and refusals are unchanged. Diets without the field keep whole-item credit. The three
+  `nutrition-pilot` diets now opt in.
+- A demand-normalised bar on a stomach smaller than 1500 × demand (Elf, Goblin) is no longer emptied early:
+  when vanilla empties the bar in one update, the reduced decrement is taken from vanilla's unclipped one.
+- A heart is meat. Organ rules exclude meat and fish rules exclude shellfish and egg, so when another mod also
+  tags the Cannibalism heart organ, crab fish or fish roe fish, the food keeps Diet Setup's identity. Cannibalism
+  hearts and meats, Expanded Foods aged meat and sausages, and Butchering sausages and blood bread gain their
+  raw, cooked and preserved states, so state rules such as Orc raw and cooked meat reach them.
+- New source tags: Expanded Foods aged meat, fish nuggets, broths and lime eggs; Butchering offal and blood;
+  Cannibalism smoked meats and sapient blood; Primitive Survival cooked roe; A Culinary Artillery egg portions.
+- `config/food-composition.json` declares recipe-based satiety shares for Expanded Foods sausages and pemmican and
+  Butchering blood sausage, black pudding, blood bread and blood dough, which record no per-ingredient provenance.
+  Each portion resolves as its own source. These are approximations; each row's note gives the recipe and the
+  alternative splits.
+- `ModConfig-examples/candidate-diets/` holds inactive candidate diets for all six races.
 
 ## 1.0.3-nutrition.1 — local Diet Test candidate (not released)
 

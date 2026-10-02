@@ -4,6 +4,7 @@
   "extends": "base",
   "nutritionModel": "demandNormalised",
   "nutritionRequirement": 1.0,
+  "overflowNutrition": "proportional",
   // Under demandNormalised capacity sets only each bar's health share; the /5.31 from 8e2760c is kept so the shares match.
   "categories": {
     "Fruit": { "capacity": 0.151 },

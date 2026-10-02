@@ -1,6 +1,6 @@
 # Diet Setup
 
-Current source declares development candidate **1.0.2-dev.1** for Vintage Story **1.22.6 / .NET 10**. It is not published or installed by this build. Automated checks use the installed 1.22.6 assemblies; live acceptance limits are listed below.
+Current source declares local test candidate **1.0.3-nutrition.2** for Vintage Story **1.22.6 / .NET 10**. It is not published. Automated checks use the installed 1.22.6 assemblies; live acceptance limits are listed below.
 
 ## Install and configure
 
@@ -42,6 +42,13 @@ can still match generic freshness or fallback rules. This does not promise neutr
 blanket Expanded Foods compatibility. The `shellfish` identity is distinct from `fish` and `meat`
 and currently has no shellfish-specific racial rule, so crabmeat keeps the existing generic
 freshness/fallback responses.
+
+A heart is meat: organ rules exclude meat and fish rules exclude shellfish and egg, so a second mod's extra tag
+(the heart as organ, crab or fish roe as fish) cannot move a food to another rule. Expanded Foods sausages and
+pemmican and Butchering blood foods carry no per-ingredient provenance, so `config/food-composition.json` declares
+recipe-based satiety shares for them (red-meat sausage: meat .61, organ .39). Each portion resolves as its own
+source with the item's state. Real per-ingredient contributions always win, and an item's verdict tooltip still
+reads its whole-item tags.
 
 One rule wins: priority, number of required tags, then declaration order. Ordinary preference rules multiply vanilla spoilage loss. A rule requiring `fresh`, `spoiled`, or `rotten`, or carrying a satiety/nutrition spoilage curve, explicitly replaces vanilla loss. This preserves ordinary cooked-food decay and the authored Goblin meat/juice responses. No freshness durations or perish transitions are changed.
 

@@ -4,6 +4,7 @@
   "extends": "base",
   "nutritionModel": "demandNormalised",
   "nutritionRequirement": 1.0,
+  "overflowNutrition": "proportional",
   "categories": {
     "Fruit": { "capacity": 0.0 },
     "Vegetable": { "capacity": 0.0 },

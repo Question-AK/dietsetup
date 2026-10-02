@@ -11,11 +11,15 @@ For testing without RaceFramework, an admin can use `/dietassignrules goblin`, `
 
 ## Demand-normalised nutrition pilot (inactive)
 
-`nutrition-pilot/` holds Human, Orc and Half-Giant diets that opt into `"nutritionModel": "demandNormalised"` with `"nutritionRequirement": 1.0`. Each is the shipped diet (Half-Giant: the `8e2760c` rig diet) with only those two fields added, so capacities, health shares, rules and permissions are unchanged. Diets without the field keep the legacy model.
+`nutrition-pilot/` holds Human, Orc and Half-Giant diets that opt into `"nutritionModel": "demandNormalised"` with `"nutritionRequirement": 1.0` and `"overflowNutrition": "proportional"`. Each is the shipped diet (Half-Giant: the `8e2760c` rig diet) with only those three fields added, so capacities, health shares, rules and permissions are unchanged; the Orc pilot also carries the shipped Orc's organ and fish excludes. Diets without the field keep the legacy model.
 
 - Gain is normalised to racial food demand (PlayerModelLib `saturationLossFactor`) and divided by the requirement; capacity sets only each bar's health share and whether it is supported.
 - Decay follows the Human 1500-point curve for every opted-in race, independent of the requirement and the racial hunger factor. Loss delays, dairy's half rate, cold, idle, sprint and calendar scaling are kept.
 - A diet-level `nutritionRequirement` can be overridden per category (`"categories": { "Protein": { "nutritionRequirement": 1.5 } }`). Values must be finite and positive. A requirement on a legacy diet is refused.
-- Eating near full still credits a whole item's nutrition; proportional overflow is not part of this pilot.
+- A mouthful that overflows the stomach credits only the share of its nutrition that fitted (`/dietfood last` shows `overflow=proportional` and the fraction). Delete the `overflowNutrition` line to test whole-item credit instead.
 
 To enable on a test server, copy the three files into `ModConfig/dietsetup/diets/` (replacing any `halfgiant.json` already there), make sure `bindings.json` maps `rf-halfgiant-positive` to `halfgiant`, then restart or run `/dietreload`. `/dietshow orc` reports `nutritionModel=DemandNormalised`, and `/dietdiag` adds the player's demand factor. Remove the files and reload to return to the legacy diets. Existing bars keep their share of the stomach across the switch.
+
+## Candidate racial diets (not active)
+
+`candidate-diets/` holds an opt-in candidate diet for each of the six races. They are proposals for selection, not defaults; see [candidate-diets/README.md](candidate-diets/README.md).
