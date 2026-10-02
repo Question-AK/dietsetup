@@ -32,7 +32,8 @@ internal static class DietNutritionDecayPatch
     }
 
     [HarmonyPostfix]
-    private static void Postfix(EntityBehaviorHunger __instance, (CompiledDiet? Diet, float Max, float Demand, float[]? Levels) __state)
+    private static void Postfix(EntityBehaviorHunger __instance, float satLossMultiplier,
+        (CompiledDiet? Diet, float Max, float Demand, float[]? Levels) __state)
     {
         if (__state.Levels == null) return;
         bool changed = false;
@@ -41,14 +42,22 @@ internal static class DietNutritionDecayPatch
             if (!DietNutritionBasis.Supports(__state.Diet, Categories[i])) continue;
             float before = __state.Levels[i];
             float after = DietDiagnostics.Level(__instance, Categories[i]);
-            // A paused bar did not move; a bar vanilla emptied stays empty rather than creeping towards zero.
-            if (!(after > 0f) || !(after < before)) continue;
+            // A paused bar did not move.
+            if (!(after < before)) continue;
             float ratio = DemandNutrition.DecayRatio(before, __state.Max, __state.Demand);
             if (ratio == 1f) continue;
-            DietConsumption.SetLevel(__instance, Categories[i], Math.Max(0f, before - (before - after) * ratio));
+            // Vanilla clamps an emptied bar at zero, hiding its decrement; a ratio below 1 must not inherit that clamp.
+            float decrement = after > 0f ? before - after
+                : Math.Max(before, VanillaDecrement(before, satLossMultiplier, Categories[i]));
+            DietConsumption.SetLevel(__instance, Categories[i], Math.Max(0f, before - decrement * ratio));
             changed = true;
         }
         // Vanilla's own health update ran between its decrements and this correction.
         if (changed) __instance.UpdateNutrientHealthBoost();
     }
+
+    // The original multiplies its own satLossMultiplier by HungerSpeedModifier and hungerrate, after PlayerModelLib's
+    // ref prefix; a Harmony postfix reads the argument as the body left it, so this is the rate vanilla applied.
+    private static float VanillaDecrement(float level, float satLossMultiplier, EnumFoodCategory category) =>
+        Math.Max(0.5f, 0.001f * level) * satLossMultiplier * 0.25f * (category == EnumFoodCategory.Dairy ? 0.5f : 1f);
 }
