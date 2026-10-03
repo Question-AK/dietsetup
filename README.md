@@ -1,6 +1,6 @@
 # Diet Setup
 
-Current source declares local release candidate **1.0.3-rc.1** for Vintage Story **1.22.6 / .NET 10**. It is not published. Automated checks use the installed 1.22.6 assemblies; live acceptance limits are listed below.
+Diet Setup **1.1.0** for Vintage Story **1.22.6 / .NET 10**. Automated checks use the installed 1.22.6 assemblies; live acceptance limits are listed below.
 
 ## Install and configure
 

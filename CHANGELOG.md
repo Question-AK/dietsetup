@@ -1,57 +1,61 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 — 4 October 2026
 
-- Update candidate-diet documentation for the released Orc, Elf and Half-Giant hunger values, and pair the Half-Giant
-  diet with the Race Framework release that adds the Half-Giant and the RF Mechanics release with Half-Giant support.
+Food tooltips
 
-## 1.0.3-rc.1 — local release candidate (not released)
+- Food tooltips now say how a food suits your diet ("A feast to you", "Sits poorly with you") and how its
+  freshness changes that ("At its best for you now", "Past its best for you"). The example Elf, Dwarf and
+  Goblin diets add lines in each race's voice.
 
-- Retains the current nutrition, raw-meat, compiler, tooltip and food-voice source for independent release review.
-- Adds the missing `rf-halfgiant-positive` binding to the supplied bindings example and documents the explicit
-  Half-Giant candidate-diet install. Candidate diets remain inactive unless an administrator copies and selects them.
-- Corrects the rot-intake documentation and `/dietrotintake` text: current RF Mechanics responds to literal
-  `game:rot` and does not consume Diet Setup's rot-intake attributes.
-
-## 1.0.3-nutrition.2 — local Diet Test candidate (not released)
-
-- Diets can opt into `"overflowNutrition": "proportional"`. A mouthful then gives only the share of its nutrition
-  whose satiety fitted in the stomach: with 25 space, a 100-satiety meat gives a quarter of its nutrition. One
-  fraction covers every part of the mouthful (meal ingredients, ACA rows, base item), whatever their order. A
-  bowl or pie serving already cut to the space keeps all of its nutrition. Items eaten, satiety, healing,
-  intoxication and refusals are unchanged. Diets without the field keep whole-item credit. The three
-  `nutrition-pilot` diets now opt in.
-- A demand-normalised bar on a stomach smaller than 1500 × demand (Elf, Goblin) is no longer emptied early:
-  when vanilla empties the bar in one update, the reduced decrement is taken from vanilla's unclipped one.
-- A heart is meat. Organ rules exclude meat and fish rules exclude shellfish and egg, so when another mod also
-  tags the Cannibalism heart organ, crab fish or fish roe fish, the food keeps Diet Setup's identity. Cannibalism
-  hearts and meats, Expanded Foods aged meat and sausages, and Butchering sausages and blood bread gain their
-  raw, cooked and preserved states, so state rules such as Orc raw and cooked meat reach them.
-- New source tags: Expanded Foods aged meat, fish nuggets, broths and lime eggs; Butchering offal and blood;
-  Cannibalism smoked meats and sapient blood; Primitive Survival cooked roe; A Culinary Artillery egg portions.
-- `config/food-composition.json` declares recipe-based satiety shares for Expanded Foods sausages and pemmican and
-  Butchering blood sausage, black pudding, blood bread and blood dough, which record no per-ingredient provenance.
-  Each portion resolves as its own source. These are approximations; each row's note gives the recipe and the
-  alternative splits.
-- `ModConfig-examples/candidate-diets/` holds inactive candidate diets for all six races.
-
-## 1.0.3-nutrition.1 — local Diet Test candidate (not released)
+Nutrition
 
 - Diets can opt into `"nutritionModel": "demandNormalised"`: gain is measured against the race's own food
-  demand and an optional `nutritionRequirement`, and bars decay on the Human curve. Diets without the field
-  behave as before. Inactive Human, Orc and Half-Giant pilot diets are in `ModConfig-examples/nutrition-pilot/`.
-- The nutrition health bonus can no longer exceed 12.5. A bar above the stomach size counts as full, not more.
-- Changing race or stomach size keeps each nutrition bar's share of the stomach. A Half-Giant with full
-  bars who becomes a Human has full Human bars, not five times them. A bar the old diet did not weigh
-  starts empty, so switching cannot fill it. Saves from earlier builds have oversized bars cut to full.
-- A mouthful that starts on a full stomach is still eaten where vanilla allows it, but it gives no
-  nutrition. One decision covers every part of the mouthful (meal ingredients, ACA rows, base item).
-  A mouthful that starts just below full still gives the whole item's nutrition; this is not a strict
-  daily nutrition budget.
-- When the stomach gets smaller, satiety above the new maximum is removed on the next hunger tick,
-  attack or meal. Loading a world removes nothing. A larger stomach adds no satiety.
-- `/dietdiag` shows observed MaxHealth as base, `maxhealthExtraPoints` and all modifiers, and the nutrition
-  bonus computed from the current bars. It no longer prints `(not set)` from a property 1.22 never writes.
+  demand and an optional `nutritionRequirement`, so big eaters are not penalised, and bars decay on the Human
+  curve. A bar on a stomach smaller than 1500 × demand (Elf, Goblin) is not emptied early.
+- Diets can opt into `"overflowNutrition": "proportional"`: a mouthful that overfills the stomach gives only
+  the share of its nutrition whose satiety fitted. A bowl or pie serving already cut to the space keeps all of
+  its nutrition. Diets without either field behave as before.
+- A mouthful that starts on a full stomach is still eaten where vanilla allows it, but gives no nutrition.
+- The nutrition health bonus is capped at 12.5 HP, and a bar above the stomach size counts as full.
+- Changing race or stomach size keeps each nutrition bar's share of the stomach. A bar the old diet did not
+  weigh starts empty. Saves from earlier builds have oversized bars cut to full.
+- When the stomach gets smaller, satiety above the new maximum is removed on the next hunger tick, attack or
+  meal. Loading a world removes nothing.
+
+Food identity and food-mod coverage
+
+- A heated pot meal's raw ingredients count as cooked, so a stew's meat is cooked meat. Pies keep the pie's
+  state, and mixing-bowl foods stay unheated.
+- A heart is meat. When another mod also tags the Cannibalism heart, crab or fish roe, the food keeps Diet
+  Setup's identity.
+- New source tags and states: Expanded Foods aged meat, sausages, pemmican, fish nuggets, broths and lime eggs;
+  Butchering offal, blood, sausages, black pudding and blood bread; Cannibalism hearts, meats and smoked meats;
+  Primitive Survival cooked roe; A Culinary Artillery egg portions.
+- `config/food-composition.json` declares recipe-based shares for sausages, pemmican, blood sausage, black
+  pudding, blood bread and blood dough. These are approximations; each row's note gives the recipe.
+- A grant restricted to named diets no longer refuses stews and foods made with that material for other
+  diets, where the meal never uses the grant. Food eaten directly is still checked.
+
+Examples and diagnostics
+
+- `ModConfig-examples/candidate-diets/` holds inactive example diets for all six races, including the
+  Half-Giant, with documented hunger figures for the Race Framework 1.1.0 races. Orcs and Goblins have
+  opt-in raw-meat grants. The bindings example includes `rf-halfgiant-positive`.
+- `/dietdiag` shows max health as base, extra points and all modifiers, plus the nutrition bonus.
+- Rot-intake documentation and `/dietrotintake` text are corrected: RF Mechanics responds to literal
+  `game:rot` and does not read Diet Setup's rot-intake attributes.
+- Includes all 1.0.2-dev.1 changes.
+
+Known limitations:
+
+- The example race diets are provisional and inactive; an administrator must copy and select them. Race
+  Framework and RF Mechanics stay optional, and installing them does not bind races to diets.
+- Food-mod coverage is partial, and the sausage and blood-food compositions are approximations.
+- After a race change, the stomach size updates when the world is reloaded.
+- Multiplayer reconnect and broad live gameplay testing remain limited.
+
+For Vintage Story 1.22.6.
 
 ## 1.0.2-dev.1 — development candidate
 
