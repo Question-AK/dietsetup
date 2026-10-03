@@ -1,4 +1,5 @@
 {
+  // Requires the Race Framework release that adds the Half-Giant; if paired, use the RF Mechanics release with Half-Giant support.
   "schemaVersion": 1,
   "bindings": {
     "rf-orc-positive": "orc",

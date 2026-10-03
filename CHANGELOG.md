@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Update candidate-diet documentation for the released Orc, Elf and Half-Giant hunger values, and pair the Half-Giant
+  diet with the Race Framework release that adds the Half-Giant and the RF Mechanics release with Half-Giant support.
+
 ## 1.0.3-rc.1 — local release candidate (not released)
 
 - Retains the current nutrition, raw-meat, compiler, tooltip and food-voice source for independent release review.

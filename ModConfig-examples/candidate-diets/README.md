@@ -7,9 +7,10 @@ Test rig's active configuration. Every file is a whole-file override that extend
 ## Selecting one
 
 1. Copy `<race>.json` to the server's `ModConfig/dietsetup/diets/<race>.json`. For Human, Orc and Half-Giant this
-   replaces the nutrition pilot. To select it through RaceFramework, add the matching `rf-<race>-positive` mapping to
-   `ModConfig/dietsetup/bindings.json`; the supplied bindings example contains all six mappings. Without RaceFramework,
-   an administrator can select the copied diet with `/dietassignrules <race>`.
+   replaces the nutrition pilot. To select it through the Race Framework release that adds the Half-Giant, add the
+   matching `rf-<race>-positive` mapping to `ModConfig/dietsetup/bindings.json`; if RF Mechanics is also installed,
+   use the RF Mechanics release with Half-Giant support. The supplied bindings example contains all six mappings.
+   Without RaceFramework, an administrator can select the copied diet with `/dietassignrules <race>`.
 2. Orc and Goblin: to let them eat raw meat, also copy `food-overrides.json` to `ModConfig/dietsetup/food-overrides.json`
    (merge its three grants by hand if that file already exists). Grant changes need a world restart.
 3. Run `/dietreload` (or restart), then `/dietshow <race>` should report `nutritionModel=DemandNormalised` and
@@ -45,19 +46,19 @@ Holding one bar full takes about 9.4% of a day's satiety at bar gain 1.0 (dairy 
 The last table divides that by the best bar gain each basket offers and adds up the supported bars: under 100%
 means a race can keep every bar full on that basket with room to spare.
 
-Demand uses each race's stomach and PlayerModelLib hunger factor (Human 1500/1.0, Elf 1050/1.0, Dwarf 1950/1.0,
-Goblin 1050/1.15, Orc 3750/1.0, Half-Giant 7965/5.31) and a daily Human demand of 2765 satiety.
+Demand uses each race's stomach and PlayerModelLib hunger factor (Human 1500/1.0, Elf 1050/0.525, Dwarf 1950/1.0,
+Goblin 1050/1.15, Orc 3750/1.4, Half-Giant 10950/5.31) and a daily Human demand of 2765 satiety.
 
 ### Demand
 
 | Race | Stomach | Daily demand (satiety) | Days on a full stomach | Supported bars |
 |---|---|---|---|---|
 | Human | 1500 | 2765 | 0.54 | Fruit, Vegetable, Grain, Protein, Dairy |
-| Elf | 1050 | 2765 | 0.38 | Fruit, Vegetable, Grain, Protein |
+| Elf | 1050 | 1452 | 0.72 | Fruit, Vegetable, Grain, Protein |
 | Dwarf | 1950 | 2765 | 0.71 | Fruit, Vegetable, Grain, Protein, Dairy |
 | Goblin | 1050 | 3180 | 0.33 | Fruit, Vegetable, Grain, Protein, Dairy |
-| Orc | 3750 | 2765 | 1.36 | Grain, Protein, Dairy |
-| Half-Giant | 7965 | 14682 | 0.54 | Fruit, Vegetable, Grain, Protein, Dairy |
+| Orc | 3750 | 3871 | 0.97 | Grain, Protein, Dairy |
+| Half-Giant | 10950 | 14682 | 0.75 | Fruit, Vegetable, Grain, Protein, Dairy |
 
 ### Home foods: satiety × nutrition
 

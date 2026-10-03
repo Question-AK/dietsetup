@@ -36,7 +36,7 @@ For standalone testing without RaceFramework, use an account with `controlserver
 
 ### Opt-in Half-Giant candidate
 
-The Half-Giant diet is inactive until the server administrator copies `ModConfig-examples/candidate-diets/halfgiant.json` to `ModConfig/dietsetup/diets/halfgiant.json`. To select it through RaceFramework, use a compatible RaceFramework build that provides `rf-halfgiant-positive`, then copy `ModConfig-examples/bindings.json.example` as described above or add `"rf-halfgiant-positive": "halfgiant"` to the existing bindings file. Run `/dietreload`, then `/dietshow halfgiant` and `/dietdiag` on a Half-Giant character. RaceFramework and RF Mechanics remain optional: this sample does not install, enable, or require either companion mod.
+The Half-Giant diet is inactive until the server administrator copies `ModConfig-examples/candidate-diets/halfgiant.json` to `ModConfig/dietsetup/diets/halfgiant.json`. To select it through the Race Framework release that adds the Half-Giant, copy `ModConfig-examples/bindings.json.example` as described above or add `"rf-halfgiant-positive": "halfgiant"` to the existing bindings file. Run `/dietreload`, then `/dietshow halfgiant` and `/dietdiag` on a Half-Giant character. Race Framework and RF Mechanics remain optional: this sample does not install, enable, or require either companion mod. If RF Mechanics is also used, use the RF Mechanics release with Half-Giant support.
 
 ## Food and spoilage
 
