@@ -79,6 +79,16 @@ For Vintage Story 1.22.6.
   share of the whole. A portion a diet refuses reads zero rather than its slice of the total, and the
   portion rows sum back to the composite. No nourishment calculation changed.
 
+## 1.0.0 - initial baseline, 7 September 2026
+
+- Six configurable diet profiles: base, human, dwarf, elf, orc and goblin.
+- Food preferences, nutrition capacities, spoilage responses and ingredient handling for meals, pies and drinks.
+- Server-supplied settings, diagnostics and opt-in race bindings; includes the final-item rot-intake fix.
+- Hydration integration is not included.
+- Includes original-work MIT licensing, third-party notices and source/build identity.
+
+Prepared for client/server deployment before the first ModDB release. Live gameplay and existing-world installation/removal acceptance remain unverified.
+
 ## 1.0.1-rc.1 ? candidate, unpublished
 
 - Snapshot of current development for gameplay acceptance; not an approved stable release.
