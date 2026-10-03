@@ -255,7 +255,7 @@ public class DietSetupModSystem : ModSystem
     private void RegisterRotIntakeDebugCommand(ICoreServerAPI api)
     {
         api.ChatCommands.Create("dietrotintake")
-            .WithDescription("Debug: get/set/clear your own rot-intake accumulator (dietsetup:intake:rot), for testing rfmechanics' goblin rot aura without eating rotten food and waiting for decay.")
+            .WithDescription("Debug: get/set/clear your own Diet Setup rot-intake accumulator (dietsetup:intake:rot). It does not control current RF Mechanics rot behavior.")
             .RequiresPrivilege(Privilege.controlserver)
             .WithArgs(api.ChatCommands.Parsers.OptionalFloat("value"))
             .HandleWith(args =>
@@ -277,7 +277,7 @@ public class DietSetupModSystem : ModSystem
                 float value = (float)args[0];
                 wa.SetDouble(valueKey, value);
                 wa.SetDouble(updatedKey, caller.Entity.World.Calendar.TotalHours);
-                return TextCommandResult.Success($"Set {valueKey}={value:F4} (timestamp reset to now, cap is {Config.RotIntakeCap:F2}). Check rfmechanics' /rfrotdiag to see the resulting aura shape.");
+                return TextCommandResult.Success($"Set {valueKey}={value:F4} (timestamp reset to now, cap is {Config.RotIntakeCap:F2}). Current RF Mechanics reacts to game:rot, not this accumulator.");
             });
     }
     private void RegisterSetNutritionCommand(ICoreServerAPI api)

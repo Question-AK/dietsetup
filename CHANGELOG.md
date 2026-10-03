@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.3-rc.1 — local release candidate (not released)
+
+- Retains the current nutrition, raw-meat, compiler, tooltip and food-voice source for independent release review.
+- Adds the missing `rf-halfgiant-positive` binding to the supplied bindings example and documents the explicit
+  Half-Giant candidate-diet install. Candidate diets remain inactive unless an administrator copies and selects them.
+- Corrects the rot-intake documentation and `/dietrotintake` text: current RF Mechanics responds to literal
+  `game:rot` and does not consume Diet Setup's rot-intake attributes.
+
 ## 1.0.3-nutrition.2 — local Diet Test candidate (not released)
 
 - Diets can opt into `"overflowNutrition": "proportional"`. A mouthful then gives only the share of its nutrition

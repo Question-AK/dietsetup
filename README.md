@@ -1,6 +1,6 @@
 # Diet Setup
 
-Current source declares local test candidate **1.0.3-nutrition.2** for Vintage Story **1.22.6 / .NET 10**. It is not published. Automated checks use the installed 1.22.6 assemblies; live acceptance limits are listed below.
+Current source declares local release candidate **1.0.3-rc.1** for Vintage Story **1.22.6 / .NET 10**. It is not published. Automated checks use the installed 1.22.6 assemblies; live acceptance limits are listed below.
 
 ## Install and configure
 
@@ -33,6 +33,10 @@ For standalone testing without RaceFramework, use an account with `controlserver
 ```
 
 `/dietassignrules clear` removes the explicit override and returns to bindings/default. An explicit assignment takes precedence over race traits.
+
+### Opt-in Half-Giant candidate
+
+The Half-Giant diet is inactive until the server administrator copies `ModConfig-examples/candidate-diets/halfgiant.json` to `ModConfig/dietsetup/diets/halfgiant.json`. To select it through RaceFramework, use a compatible RaceFramework build that provides `rf-halfgiant-positive`, then copy `ModConfig-examples/bindings.json.example` as described above or add `"rf-halfgiant-positive": "halfgiant"` to the existing bindings file. Run `/dietreload`, then `/dietshow halfgiant` and `/dietdiag` on a Half-Giant character. RaceFramework and RF Mechanics remain optional: this sample does not install, enable, or require either companion mod.
 
 ## Food and spoilage
 
@@ -86,8 +90,8 @@ Include the ZIP version and SHA-256, packaged `build-info.json`, startup build i
 `ModConfig/dietsetup.json` holds:
 
 - `EnableDietSystem` (true): disables diet math, effects, rot intake and this mod's grants when false. `/dietreload` updates it without restarting; vanilla full-stomach nutrition guards are restored.
-- `EnableRotIntakeTracking` (true): additional switch for rot tracking while the diet system is enabled.
-- `RotIntakePerBite` (0.08), `RotIntakeCap` (1.0), `IntakeHalfLifeHours` (`{"rot":48.0}`): finite accumulator values; half-lives must be positive. The rot half-life must match the consuming RFMechanics configuration.
+- `EnableRotIntakeTracking` (true): additional switch for Diet Setup's rot-intake tracking while the diet system is enabled.
+- `RotIntakePerBite` (0.08), `RotIntakeCap` (1.0), `IntakeHalfLifeHours` (`{"rot":48.0}`): finite accumulator values; half-lives must be positive.
 - `CapacityFloor` (0.05): finite positive floor for nonzero capacities.
 - `RecordLastConsumption` (true): stores one last consumption report per connected player.
 
@@ -109,7 +113,7 @@ Automated regression checks cover game-assembly eating adapters and simulated cl
 
 ## Rot intake integration
 
-DietSetup writes `dietsetup:intake:rot` and `dietsetup:intake:rot:updatedHours` to player WatchedAttributes. The first is a bounded unitless intake; the second is the world-calendar timestamp. Consumers calculate exponential half-life decay from that timestamp. Fresh food contributes zero; failed/cancelled/zero-serving consumption contributes zero. These keys are the RFMechanics integration contract.
+DietSetup writes `dietsetup:intake:rot` and `dietsetup:intake:rot:updatedHours` to player WatchedAttributes. The first is a bounded unitless intake; the second is the world-calendar timestamp used for its exponential half-life decay. Fresh food contributes zero; failed/cancelled/zero-serving consumption contributes zero. Current RF Mechanics uses literal `game:rot` consumption and does not read these attributes, so they are not an RF Mechanics integration contract.
 
 
 ## Development and AI use

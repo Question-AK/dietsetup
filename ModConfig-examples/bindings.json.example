@@ -5,7 +5,8 @@
     "rf-dwarf-positive": "dwarf",
     "rf-goblin-positive": "goblin",
     "rf-elf-positive": "elf",
-    "rf-human-positive": "human"
+    "rf-human-positive": "human",
+    "rf-halfgiant-positive": "halfgiant"
   },
   "default": "base"
 }

@@ -7,7 +7,9 @@ Test rig's active configuration. Every file is a whole-file override that extend
 ## Selecting one
 
 1. Copy `<race>.json` to the server's `ModConfig/dietsetup/diets/<race>.json`. For Human, Orc and Half-Giant this
-   replaces the nutrition pilot. Bindings stay as they are: each `rf-<race>-positive` trait already maps to `<race>`.
+   replaces the nutrition pilot. To select it through RaceFramework, add the matching `rf-<race>-positive` mapping to
+   `ModConfig/dietsetup/bindings.json`; the supplied bindings example contains all six mappings. Without RaceFramework,
+   an administrator can select the copied diet with `/dietassignrules <race>`.
 2. Orc and Goblin: to let them eat raw meat, also copy `food-overrides.json` to `ModConfig/dietsetup/food-overrides.json`
    (merge its three grants by hand if that file already exists). Grant changes need a world restart.
 3. Run `/dietreload` (or restart), then `/dietshow <race>` should report `nutritionModel=DemandNormalised` and
