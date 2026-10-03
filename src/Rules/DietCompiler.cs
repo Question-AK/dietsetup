@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using dietsetup.Tags;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 
 namespace dietsetup.Rules;
 
@@ -174,11 +175,25 @@ public static class DietCompiler
         CompiledValue satiety = satietyIsCurve ? CompiledValue.FromCurve(SortAnchors(rf.SatietyCurve!)) : CompiledValue.Flat(satietyMult);
         CompiledValue nutrition = nutritionIsCurve ? CompiledValue.FromCurve(SortAnchors(rf.NutritionCurve!)) : CompiledValue.Flat(nutritionMult);
 
+        CompiledLine[] lines = (rf.Lines ?? Array.Empty<DietLineFile>())
+            .Select(l => new CompiledLine(l.Spoil, l.Line!)).OrderBy(l => l.Spoil).ToArray();
+        foreach (CompiledLine line in lines)
+        {
+            if (MissingTranslation(line.Key))
+                warnings.Add(new DietValidationMessage(17, $"rule '{label}': line '{line.Key}' has no '{Lang.CurrentLocale}' translation"));
+        }
+
         return new CompiledRule(
             requiresMask, excludesMask, BitOperations.PopCount(requiresMask), rf.Priority ?? 0,
             verdict, satiety, nutrition, effects, label, rf.ShadowedIntentionally ?? false,
-            satietyIsCurve || nutritionIsCurve || requires.Any(t => t is "fresh" or "spoiled" or "rotten"));
+            satietyIsCurve || nutritionIsCurve || requires.Any(t => t is "fresh" or "spoiled" or "rotten"), lines);
     }
+
+    /// <summary>Lang.HasTranslation indexes the current locale directly and throws when no language is loaded,
+    /// so a compile with no language (a bare test or tool) has nothing to check against.</summary>
+    private static bool MissingTranslation(string key) =>
+        Lang.CurrentLocale is { } locale && Lang.AvailableLanguages.TryGetValue(locale, out ITranslationService? language)
+        && !language.HasTranslation(key, false, false);
     private static CurveAnchor[] SortAnchors(CurveAnchorFile[] anchorsFile)
     {
         var anchors = new CurveAnchor[anchorsFile.Length];
@@ -394,6 +409,21 @@ public static class DietCompiler
                 if (!positions.Add(anchor.Spoil)) errors.Add($"{path}: duplicate spoil position {anchor.Spoil}");
             }
         }
+        void Lines(DietLineFile[]? values, string path)
+        {
+            if (values == null) return;
+            if (values.Length == 0) errors.Add($"{path}: must have lines");
+            var positions = new HashSet<float>();
+            for (int i = 0; i < values.Length; i++)
+            {
+                var line = values[i]; Object(line, $"{path}[{i}]");
+                if (line == null) continue;
+                Number(line.Spoil, $"{path}[{i}].spoil");
+                if (line.Spoil < 0 || line.Spoil > 1) errors.Add($"{path}[{i}].spoil: outside 0..1");
+                if (!positions.Add(line.Spoil)) errors.Add($"{path}: duplicate spoil position {line.Spoil}");
+                if (string.IsNullOrWhiteSpace(line.Line)) errors.Add($"{path}[{i}].line: expected a lang key");
+            }
+        }
         Object(doc, "diet");
         if (doc == null) return errors;
         if (!TryParseNutritionModel(doc.NutritionModel, out _))
@@ -424,6 +454,7 @@ public static class DietCompiler
                 errors.Add($"{path}: requires/excludes cannot contain null or empty tag names");
             Number(rule.SatietyMult, path + ".satietyMult"); Number(rule.NutritionMult, path + ".nutritionMult");
             Curve(rule.SatietyCurve, path + ".satietyCurve"); Curve(rule.NutritionCurve, path + ".nutritionCurve");
+            Lines(rule.Lines, path + ".lines");
             if (rule.Effects == null) continue;
             for (int j = 0; j < rule.Effects.Length; j++)
             {

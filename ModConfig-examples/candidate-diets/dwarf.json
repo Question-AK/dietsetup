@@ -15,11 +15,11 @@
   "fallback": { "satietyMult": 1.0, "nutritionMult": 1.0 },
   "rules": [
     // Source x preparation pairs are explicit and outrank both single-tag layers, so no pairing wins by accident.
-    { "requires": ["leaf", "preserved"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.5 },
-    { "requires": ["root", "preserved"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.75 },
-    { "requires": ["fruit", "preserved"], "priority": 35, "satietyMult": 1.0, "nutritionMult": 1.25 },
-    { "requires": ["meat", "preserved"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.5 },
-    { "requires": ["fish", "preserved"], "excludes": ["shellfish", "egg"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.5 },
+    { "requires": ["leaf", "preserved"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.5, "lines": [ { "spoil": 0.0, "line": "dietsetup:voice-dwarf-well-kept" } ] },
+    { "requires": ["root", "preserved"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.75, "lines": [ { "spoil": 0.0, "line": "dietsetup:voice-dwarf-well-kept" } ] },
+    { "requires": ["fruit", "preserved"], "priority": 35, "satietyMult": 1.0, "nutritionMult": 1.25, "lines": [ { "spoil": 0.0, "line": "dietsetup:voice-dwarf-well-kept" } ] },
+    { "requires": ["meat", "preserved"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.5, "lines": [ { "spoil": 0.0, "line": "dietsetup:voice-dwarf-well-kept" } ] },
+    { "requires": ["fish", "preserved"], "excludes": ["shellfish", "egg"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.5, "lines": [ { "spoil": 0.0, "line": "dietsetup:voice-dwarf-well-kept" } ] },
     { "requires": ["meat", "raw"], "priority": 35, "satietyMult": 0.5, "nutritionMult": 0.15 },
     { "requires": ["grain", "cooked"], "priority": 35, "satietyMult": 1.0, "nutritionMult": 1.33 },
     { "requires": ["fungus"], "priority": 30, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 2.5 },
@@ -27,7 +27,7 @@
     { "requires": ["leaf"], "priority": 30, "satietyMult": 0.75, "nutritionMult": 0.75 },
     { "requires": ["fruit"], "priority": 30, "satietyMult": 0.75, "nutritionMult": 0.75 },
     { "requires": ["alcohol"], "priority": 25, "verdict": "nourishing", "satietyMult": 1.5, "nutritionMult": 1.5 },
-    { "requires": ["preserved"], "priority": 25, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.25 },
+    { "requires": ["preserved"], "priority": 25, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.25, "lines": [ { "spoil": 0.0, "line": "dietsetup:voice-dwarf-well-kept" } ] },
     { "requires": ["juice", "liquid"], "priority": 25, "satietyMult": 1.0, "nutritionMult": 1.0 }
   ]
 }

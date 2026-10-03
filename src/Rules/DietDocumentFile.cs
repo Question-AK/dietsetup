@@ -47,6 +47,14 @@ public class DietRuleFileEntry : DietAuthoringFile
     public DietEffectFile[]? Effects { get; set; }
     public float? Capacity { get; set; }
     public bool? ShadowedIntentionally { get; set; }
+    public DietLineFile[]? Lines { get; set; }
+}
+
+/// <summary>A tooltip line in the eater's voice: a lang key shown from this spoil level up to the next line's.</summary>
+public class DietLineFile : DietAuthoringFile
+{
+    public float Spoil { get; set; }
+    public string? Line { get; set; }
 }
 
 public class CurveAnchorFile : DietAuthoringFile

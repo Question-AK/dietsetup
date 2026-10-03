@@ -19,16 +19,21 @@
     // Fish stays permitted without the fresh bonus; once it turns it follows the same gradual decline.
     { "requires": ["fish", "spoiled"], "excludes": ["shellfish", "egg"], "priority": 35,
       "satietyCurve": [ { "spoil": 0.0, "value": 1.0 }, { "spoil": 0.25, "value": 0.72 }, { "spoil": 0.5, "value": 0.44 }, { "spoil": 1.0, "value": 0.08 } ],
-      "nutritionCurve": [ { "spoil": 0.0, "value": 1.0 }, { "spoil": 0.15, "value": 0.8 }, { "spoil": 0.35, "value": 0.48 }, { "spoil": 0.6, "value": 0.24 }, { "spoil": 1.0, "value": 0.12 } ] },
+      "nutritionCurve": [ { "spoil": 0.0, "value": 1.0 }, { "spoil": 0.15, "value": 0.8 }, { "spoil": 0.35, "value": 0.48 }, { "spoil": 0.6, "value": 0.24 }, { "spoil": 1.0, "value": 0.12 } ],
+      "lines": [ { "spoil": 0.0, "line": "dietsetup:voice-elf-fading" }, { "spoil": 0.5, "line": "dietsetup:voice-elf-little-left" } ] },
     { "requires": ["seed"], "priority": 30, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.75 },
     { "requires": ["nut"], "priority": 30, "verdict": "nourishing", "satietyMult": 1.0, "nutritionMult": 1.75 },
-    { "requires": ["fish"], "excludes": ["shellfish", "egg"], "priority": 30, "satietyMult": 1.0, "nutritionMult": 1.0 },
+    // Only fresh fish reaches this rule: the spoiled-fish rule above takes it from the first spoil tick.
+    { "requires": ["fish"], "excludes": ["shellfish", "egg"], "priority": 30, "satietyMult": 1.0, "nutritionMult": 1.0,
+      "lines": [ { "spoil": 0.0, "line": "dietsetup:voice-elf-fresh" } ] },
     { "requires": ["preserved"], "priority": 25, "verdict": "harmful", "satietyMult": 0.75, "nutritionMult": 0.6 },
     // Continuous with the fresh rule at spoil 0, so the first spoil tick is no longer a cliff.
     { "requires": ["spoiled"], "priority": 25,
       "satietyCurve": [ { "spoil": 0.0, "value": 1.25 }, { "spoil": 0.25, "value": 0.9 }, { "spoil": 0.5, "value": 0.55 }, { "spoil": 1.0, "value": 0.1 } ],
-      "nutritionCurve": [ { "spoil": 0.0, "value": 1.25 }, { "spoil": 0.15, "value": 1.0 }, { "spoil": 0.35, "value": 0.6 }, { "spoil": 0.6, "value": 0.3 }, { "spoil": 1.0, "value": 0.15 } ] },
+      "nutritionCurve": [ { "spoil": 0.0, "value": 1.25 }, { "spoil": 0.15, "value": 1.0 }, { "spoil": 0.35, "value": 0.6 }, { "spoil": 0.6, "value": 0.3 }, { "spoil": 1.0, "value": 0.15 } ],
+      "lines": [ { "spoil": 0.0, "line": "dietsetup:voice-elf-fading" }, { "spoil": 0.5, "line": "dietsetup:voice-elf-little-left" } ] },
     { "requires": ["juice", "liquid"], "priority": 15, "verdict": "nourishing", "satietyMult": 1.25, "nutritionMult": 1.5 },
-    { "requires": ["fresh"], "priority": 10, "verdict": "nourishing", "satietyMult": 1.25, "nutritionMult": 1.25 }
+    { "requires": ["fresh"], "priority": 10, "verdict": "nourishing", "satietyMult": 1.25, "nutritionMult": 1.25,
+      "lines": [ { "spoil": 0.0, "line": "dietsetup:voice-elf-fresh" } ] }
   ]
 }

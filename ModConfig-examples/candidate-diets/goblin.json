@@ -18,13 +18,19 @@
     { "requires": ["insect"], "priority": 36, "verdict": "nourishing", "satietyMult": 1.2, "nutritionMult": 1.5 },
     // Curves replace vanilla's spoilage loss, so satiety stays whole and the curve is the whole response to spoil.
     { "requires": ["organ"], "excludes": ["meat"], "priority": 35, "verdict": "nourishing", "satietyMult": 1.0,
-      "nutritionCurve": [ { "spoil": 0.0, "value": 1.0 }, { "spoil": 0.3, "value": 1.3 }, { "spoil": 0.6, "value": 1.4 }, { "spoil": 0.9, "value": 1.2 }, { "spoil": 1.0, "value": 1.2 } ] },
+      "nutritionCurve": [ { "spoil": 0.0, "value": 1.0 }, { "spoil": 0.3, "value": 1.3 }, { "spoil": 0.6, "value": 1.4 }, { "spoil": 0.9, "value": 1.2 }, { "spoil": 1.0, "value": 1.2 } ],
+      // Tooltip lines from each spoil level up to the next; the organ peak (95% of best) spans about 0.4 to 0.7, as meat's does.
+      "lines": [ { "spoil": 0.0, "line": "dietsetup:voice-goblin-needs-age" }, { "spoil": 0.4, "line": "dietsetup:voice-goblin-half-spoiled" }, { "spoil": 0.7, "line": "dietsetup:voice-goblin-past-best" } ] },
     { "requires": ["meat"], "priority": 35, "satietyMult": 1.0,
-      "nutritionCurve": [ { "spoil": 0.0, "value": 0.6 }, { "spoil": 0.15, "value": 1.0 }, { "spoil": 0.4, "value": 1.3 }, { "spoil": 0.7, "value": 1.3 }, { "spoil": 0.9, "value": 1.1 }, { "spoil": 1.0, "value": 1.1 } ] },
+      "nutritionCurve": [ { "spoil": 0.0, "value": 0.6 }, { "spoil": 0.15, "value": 1.0 }, { "spoil": 0.4, "value": 1.3 }, { "spoil": 0.7, "value": 1.3 }, { "spoil": 0.9, "value": 1.1 }, { "spoil": 1.0, "value": 1.1 } ],
+      "lines": [ { "spoil": 0.0, "line": "dietsetup:voice-goblin-too-fresh" }, { "spoil": 0.15, "line": "dietsetup:voice-goblin-turning" }, { "spoil": 0.4, "line": "dietsetup:voice-goblin-half-spoiled" }, { "spoil": 0.7, "line": "dietsetup:voice-goblin-past-best" } ] },
     { "requires": ["fish"], "excludes": ["shellfish", "egg"], "priority": 35, "satietyMult": 1.0,
-      "nutritionCurve": [ { "spoil": 0.0, "value": 0.6 }, { "spoil": 0.15, "value": 1.0 }, { "spoil": 0.4, "value": 1.3 }, { "spoil": 0.7, "value": 1.3 }, { "spoil": 0.9, "value": 1.1 }, { "spoil": 1.0, "value": 1.1 } ] },
+      "nutritionCurve": [ { "spoil": 0.0, "value": 0.6 }, { "spoil": 0.15, "value": 1.0 }, { "spoil": 0.4, "value": 1.3 }, { "spoil": 0.7, "value": 1.3 }, { "spoil": 0.9, "value": 1.1 }, { "spoil": 1.0, "value": 1.1 } ],
+      "lines": [ { "spoil": 0.0, "line": "dietsetup:voice-goblin-too-fresh" }, { "spoil": 0.15, "line": "dietsetup:voice-goblin-turning" }, { "spoil": 0.4, "line": "dietsetup:voice-goblin-half-spoiled" }, { "spoil": 0.7, "line": "dietsetup:voice-goblin-past-best" } ] },
+    // Nutrition passes 0.75 at about 0.6 spoil.
     { "requires": ["juice", "liquid"], "priority": 35, "satietyMult": 1.0,
-      "nutritionCurve": [ { "spoil": 0.0, "value": 0.20 }, { "spoil": 0.3, "value": 0.35 }, { "spoil": 0.85, "value": 1.10 }, { "spoil": 1.0, "value": 1.10 } ] },
+      "nutritionCurve": [ { "spoil": 0.0, "value": 0.20 }, { "spoil": 0.3, "value": 0.35 }, { "spoil": 0.85, "value": 1.10 }, { "spoil": 1.0, "value": 1.10 } ],
+      "lines": [ { "spoil": 0.0, "line": "dietsetup:voice-goblin-not-soured" }, { "spoil": 0.6, "line": "dietsetup:voice-goblin-soured" } ] },
     // Above the spoilage tolerance below, so spoiled plants stay poor rather than turning useful.
     { "requires": ["fruit"], "priority": 32, "verdict": "harmful", "satietyMult": 0.25, "nutritionMult": 0.4 },
     { "requires": ["leaf"], "priority": 32, "verdict": "harmful", "satietyMult": 0.25, "nutritionMult": 0.4 },

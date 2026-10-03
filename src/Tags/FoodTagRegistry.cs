@@ -243,11 +243,22 @@ public sealed class FoodTagRegistry
         mask |= 1UL << tagBits[pieSpoilLevel > 0f ? SpoiledTag : FreshTag];
         return mask;
     }
+    /// <summary>The same mask re-dated to another spoil level, for asking how a food's response changes with age.</summary>
+    public ulong WithSpoilLevel(ulong mask, float spoilLevel)
+    {
+        ulong freshness = (1UL << tagBits[FreshTag]) | (1UL << tagBits[SpoiledTag]);
+        if ((mask & freshness) == 0) return mask;
+        return (mask & ~freshness) | (1UL << tagBits[spoilLevel > 0f ? SpoiledTag : FreshTag]);
+    }
     public ulong GetTagMask(IWorldAccessor world, ItemSlot slot, out bool determined) =>
-        GetTagMask(world, slot, out _, out determined);
-    public ulong GetTagMask(IWorldAccessor world, ItemSlot slot, out float spoilLevel, out bool determined)
+        GetTagMask(world, slot, out _, out _, out determined);
+    public ulong GetTagMask(IWorldAccessor world, ItemSlot slot, out float spoilLevel, out bool determined) =>
+        GetTagMask(world, slot, out spoilLevel, out _, out determined);
+    /// <param name="perishes">False for food with no perish transition, which stays fresh forever.</param>
+    public ulong GetTagMask(IWorldAccessor world, ItemSlot slot, out float spoilLevel, out bool perishes, out bool determined)
     {
         determined = true;
+        perishes = false;
         spoilLevel = 0f;
         ItemStack? stack = slot.Itemstack;
         if (stack?.Collectible == null) return 0;
@@ -268,6 +279,7 @@ public sealed class FoodTagRegistry
             return mask;
         }
 
+        perishes = transitionLevel.HasValue;
         spoilLevel = transitionLevel ?? 0f;
         mask |= 1UL << tagBits[spoilLevel > 0f ? SpoiledTag : FreshTag];
 
