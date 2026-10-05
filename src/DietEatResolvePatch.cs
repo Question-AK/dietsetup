@@ -18,7 +18,7 @@ internal static class DietEatResolvePatch
         if (secondsUsed < 0.95f || slot?.Itemstack == null) return true;
         // Denying here skips vanilla's whole body: no item taken, no saturation, no intoxication,
         // no psychedelic, no health, and no transaction to take anything back from.
-        if (MaterialPermissionGate.Refuses(byEntity, slot.Itemstack)) return false;
+        if (MaterialPermissionGate.Refuses(byEntity, slot.Itemstack) || DietEatFeedback.Refuses(byEntity, slot)) return false;
         // An outer delivery site may already own this mouthful; join it rather than shadowing its queue.
         var joined = DietConsumption.Join(byEntity);
         __state = joined == null ? DietConsumption.Begin(byEntity) : null;

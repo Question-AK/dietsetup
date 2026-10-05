@@ -29,7 +29,7 @@ internal static class DietAcaExpandedFoodPatch
         if (secondsUsed < 0.95f || slot?.Itemstack == null || byEntity?.World is not IServerWorldAccessor) return true;
         // Early enough to prevent ACA's own pre-base credits and heals, which it applies before it calls
         // base -- there is nothing to withdraw because nothing was ever delivered.
-        if (MaterialPermissionGate.Refuses(byEntity, slot.Itemstack)) return false;
+        if (MaterialPermissionGate.Refuses(byEntity, slot.Itemstack) || DietEatFeedback.Refuses(byEntity, slot)) return false;
         // A nested site is already accounting for this mouthful; joining twice would credit it twice.
         if (DietConsumption.Join(byEntity) != null) return true;
 

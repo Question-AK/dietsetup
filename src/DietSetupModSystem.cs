@@ -633,6 +633,7 @@ public class DietSetupModSystem : ModSystem
             composition.ResolveStatic(api);
             Publish(new DietRuntimeSnapshot(effective.Config, tags, diets, effective.Bindings,
                 packet.Revision, packet.Hash, packet.Payload, composition));
+            DietStatsPresentation.SnapshotChanged(api);
             api.Logger.Notification("[dietsetup] received server snapshot revision={0} hash={1}", packet.Revision, packet.Hash);
         }
         catch (Exception ex)

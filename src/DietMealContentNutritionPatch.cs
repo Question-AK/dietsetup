@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using dietsetup.Composition;
@@ -18,6 +19,28 @@ namespace dietsetup;
 [HarmonyBefore(DietAcaIntegration.HarmonyId, DietAcaIntegration.ModId)]
 public static class DietMealContentNutritionPatch
 {
+    [ThreadStatic] private static List<DietMealPortion>? portionCollector;
+
+    internal static List<DietMealPortion> ResolvePortions(IWorldAccessor world, ItemSlot slot,
+        ItemStack?[] contents, EntityAgent entity)
+    {
+        var portions = new List<DietMealPortion>();
+        List<DietMealPortion>? previousCollector = portionCollector;
+        bool previousDisplayOnly = DietMealFactsContext.DisplayOnly;
+        portionCollector = portions;
+        DietMealFactsContext.DisplayOnly = true;
+        try
+        {
+            BlockMeal.GetContentNutritionProperties(world, slot, contents, entity);
+            return portions;
+        }
+        finally
+        {
+            portionCollector = previousCollector;
+            DietMealFactsContext.DisplayOnly = previousDisplayOnly;
+        }
+    }
+
     [HarmonyPrefix]
     public static bool Prefix(IWorldAccessor world, ItemSlot inSlot, ItemStack?[]? contentStacks, EntityAgent? forEntity, bool mulWithStacksize, float nutritionMul, float healthMul, ref FoodNutritionProperties[] __result)
     {
@@ -123,6 +146,7 @@ public static class DietMealContentNutritionPatch
                     row.Psychedelic *= quantity;
                     list.Add(row);
                     ingredientResults.Add(grouped);
+                    portionCollector?.Add(new DietMealPortion(grouped, row.Satiety, row));
                     if (forEntity != null)
                         ingredientTraces.Add(DietDiagnostics.Row(DietRuntimeSnapshot.For(world.Api), forEntity,
                             contentStack, spoilState, grouped, row.FoodCategory, row.Satiety));

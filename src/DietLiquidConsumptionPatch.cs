@@ -19,7 +19,7 @@ internal static class DietLiquidConsumptionPatch
         // Denied before SplitStackAndPerformAction, so the vessel keeps its liquid rather than losing a
         // portion to a mouthful that was refused. An empty vessel falls through to the base method, which
         // carries its own gate.
-        if (MaterialPermissionGate.Refuses(byEntity, slot.Itemstack)) return false;
+        if (MaterialPermissionGate.Refuses(byEntity, slot.Itemstack) || DietEatFeedback.Refuses(byEntity, slot)) return false;
         __state = DietConsumption.Begin(byEntity);
         if (__state != null) __state.CapturingLiquid = true;
         return true;

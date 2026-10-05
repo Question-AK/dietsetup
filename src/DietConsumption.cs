@@ -150,6 +150,7 @@ internal sealed class DietConsumption : IDisposable
             changed = true;
         }
         if (changed) hunger.UpdateNutrientHealthBoost();
+        if (StartedFull != true) DietEatFeedback.NoteOverflow(Entity, fraction);
         return $" overflow=proportional space={credit.Space:F2} satiety={credit.Satiety:F2} fraction={fraction:F4}";
     }
 

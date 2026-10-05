@@ -17,7 +17,8 @@ internal static class DietMealEffectFirePatch
         // The servings we were handed back unchanged: vanilla's own zero-consumption answer, and the
         // value tryFinishEatMeal tests before it replaces or takes out the bowl. Returning the default
         // 0 here would read as "all servings gone" and destroy a container nobody ate from.
-        if (MaterialPermissionGate.Refuses(eatingPlayer?.Entity, inSlot?.Itemstack, contentStacks))
+        if (MaterialPermissionGate.Refuses(eatingPlayer?.Entity, inSlot?.Itemstack, contentStacks)
+            || DietEatFeedback.Refuses(eatingPlayer?.Entity, inSlot, contentStacks))
         {
             __result = remainingServings;
             return false;
