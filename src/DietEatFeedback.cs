@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using dietsetup.Binding;
 using dietsetup.Composition;
+using dietsetup.Grants;
 using dietsetup.Rules;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -37,7 +38,7 @@ internal static class DietEatFeedback
         ItemStack?[]? contents = meal
             ? (stack.Collectible as BlockMeal)?.GetNonEmptyContents(entity.World, stack) ?? Array.Empty<ItemStack>()
             : null;
-        if (!GivesNothing(entity, slot, contents)) return false;
+        if (MaterialPermissionGate.Denies(capi, entity, stack) || !GivesNothing(entity, slot, contents)) return false;
         capi.TriggerIngameError(stack.Collectible, InedibleCode, Text("dietsetup:eat-inedible"));
         return true;
     }
@@ -87,8 +88,14 @@ internal static class DietEatFeedback
         var nutritionSlot = ReferenceEquals(nutritionStack, stack) ? slot : new DummySlot(nutritionStack);
         snapshot.Tags.GetTagMask(entity.World, nutritionSlot, out float spoil, out bool determined);
         if (!determined || !DietSpoilageResolution.TryResolve(spoil, nutritionStack, entity, out DietContributionSet set)) return false;
-        float satiety = properties.Satiety * GlobalConstants.FoodSpoilageSatLossMul(spoil, nutritionStack, entity);
-        return GivesNothing(set, satiety, properties);
+        float satietyMul = GlobalConstants.FoodSpoilageSatLossMul(spoil, nutritionStack, entity);
+        float satiety = properties.Satiety * satietyMul;
+        if (!GivesNothing(set, satiety, properties)) return false;
+        foreach (FoodNutritionProperties expanded in DietAcaIntegration.ExpandedRows(nutritionStack))
+        {
+            if (!GivesNothing(set, expanded.Satiety * satietyMul, expanded)) return false;
+        }
+        return true;
     }
 
     private static bool HasVanillaConsequence(FoodNutritionProperties properties) =>

@@ -75,7 +75,7 @@ internal static class DietAcaIntegration
         if (rawFoodType == null || stack?.Collectible == null || !rawFoodType.IsInstanceOfType(stack.Collectible)) return false;
         float[]? sats = Sats(stack);
         if (sats == null) return false;
-        for (int i = 1; i <= 5; i++) if (sats[i] != 0f) return true;
+        for (int i = 0; i <= 5; i++) if (sats[i] != 0f) return true;
         return false;
     }
 
