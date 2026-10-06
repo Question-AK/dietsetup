@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.1-rp.1 — local test candidate, 6 October 2026
+
+- Food that would give your resolved diet nothing is refused before a serving is consumed; material-denial feedback retains priority.
+- A restrained notice explains when an overflowing mouthful gives less than half its nutrition.
+- The Stats panel hides unsupported nutrition categories using the server-synced diet settings.
+- Preserves 1.1.0 nutrition, food compatibility and inactive example diets; no bindings or balance settings are enabled by installation.
+- Local trial only: offline checks passed, but in-game UI and multiplayer acceptance remain pending.
+
 ## 1.1.0 — 4 October 2026
 
 Food tooltips
