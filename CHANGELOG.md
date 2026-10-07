@@ -1,12 +1,21 @@
 # Changelog
 
-## 1.1.1-rp.1 — local test candidate, 6 October 2026
+## 1.2.0 — 7 October 2026
 
-- Food that would give your resolved diet nothing is refused before a serving is consumed; material-denial feedback retains priority.
-- A restrained notice explains when an overflowing mouthful gives less than half its nutrition.
-- The Stats panel hides unsupported nutrition categories using the server-synced diet settings.
-- Preserves 1.1.0 nutrition, food compatibility and inactive example diets; no bindings or balance settings are enabled by installation.
-- Local trial only: offline checks passed, but in-game UI and multiplayer acceptance remain pending.
+- Food, drinks and meal servings that would give your diet nothing (no satiety, nutrition or other effect) are
+  left uneaten, with the message "Your body would take nothing from this." Nothing is used up. Material-permission
+  refusals still take priority.
+- When a mouthful overfills your stomach and you get less than half of its nutrition, you see "You were too full
+  to get much from that."
+- The Stats screen shows only the nutrition categories your diet supports, using the server's diet settings.
+- Keeps all 1.1.0 nutrition, food-identity and food-mod coverage. Example diets stay inactive: installing this
+  version turns on no bindings or balance settings.
+
+Known limitations:
+
+- These messages and the Stats layout have had limited in-game and multiplayer testing.
+
+For Vintage Story 1.22.6.
 
 ## 1.1.0 — 4 October 2026
 
