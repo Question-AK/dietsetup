@@ -1,6 +1,6 @@
 # Diet Setup
 
-Diet Setup **1.1.0** for Vintage Story **1.22.6 / .NET 10**. Automated checks use the installed 1.22.6 assemblies; live acceptance limits are listed below.
+Diet Setup **1.2.0** for Vintage Story **1.22.6 / .NET 10**. Automated checks use the installed 1.22.6 assemblies; live acceptance limits are listed below.
 
 ## Install and configure
 
@@ -58,7 +58,7 @@ One rule wins: priority, number of required tags, then declaration order. Ordina
 
 Meals resolve every nutritious ingredient. Pie fillings use the pie's baked state and age; baking quality remains a separate multiplier. Filled drinks use the consumed liquid's facts. Tooltip queries never enqueue consumption data.
 
-`Inedible` means zero satiety/nutrition contribution; it does not refuse eating. `Harmful` and `Nourishing` are labels, not automatic damage/healing. Explicit consequence effects require confirmed positive consumption. Damage remains per positive eating operation, not prorated to serving size.
+`Inedible` means zero satiety/nutrition contribution. Since 1.2.0, a food, drink or meal serving whose resolved result gives nothing at all (no satiety, nutrition, vanilla health/intoxication effect, damage or custom effect) is left uneaten with a message. `Harmful` and `Nourishing` are labels, not automatic damage/healing. Explicit consequence effects require confirmed positive consumption. Damage remains per positive eating operation, not prorated to serving size.
 
 Nutrition before the bar cap is:
 
