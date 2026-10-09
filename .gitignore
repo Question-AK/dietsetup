@@ -15,3 +15,4 @@ Thumbs.db
 
 # Dev-only diet fixtures (GetMany loads every file in config/diets/ as a real diet -- never ship these)
 assets/dietsetup/config/diets/dev-*.json
+/.claude/
